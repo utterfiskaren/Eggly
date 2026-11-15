@@ -1,5 +1,6 @@
 import type { Question, Representation, Template } from "../question";
 import { int, pick, shuffle } from "../rng";
+import { fmt } from "../fmt";
 
 /**
  * Frågemallar för matte, version 1. Varje mall räknar ut facit själv: inga svar skrivs för hand och
@@ -36,17 +37,33 @@ function calc(a: number, b: number, op: Op): number {
   }
 }
 
-/** Fyra svarsalternativ: rätt svar plus vanliga fel. Alla olika, inga negativa. */
-export function distractors(rng: () => number, answer: number, near: number[]): number[] {
-  const set = new Set<number>([answer]);
-  const candidates = shuffle(rng, [...near, answer + 1, answer - 1, answer + 2, answer - 2, answer + 10, answer - 10]);
+/** Antal decimaler i ett tal (högst 3). */
+function decimalsOf(n: number): number {
+  for (let d = 0; d < 3; d++) if (Math.abs(n * 10 ** d - Math.round(n * 10 ** d)) < 1e-9) return d;
+  return 3;
+}
+
+/**
+ * Fyra svarsalternativ: rätt svar plus vanliga fel. Alla olika. Inga negativa om inte svaret (eller
+ * `allowNeg`) är negativt, och lika många decimaler som svaret.
+ */
+export function distractors(rng: () => number, answer: number, near: number[], allowNeg = false): number[] {
+  const dec = decimalsOf(answer);
+  const step = 10 ** -dec;
+  const scale = 10 ** dec;
+  const r = (x: number) => Math.round(x * scale) / scale;
+  const neg = allowNeg || answer < 0;
+  const ok = (c: number) => Number.isFinite(c) && Math.abs(c - r(c)) < 1e-9 && (neg || c >= 0);
+  const key = (x: number) => Math.round(x * 1e6);
+  const set = new Map<number, number>([[key(answer), answer]]);
+  const candidates = shuffle(rng, [...near, answer + step, answer - step, answer + 2 * step, answer - 2 * step, answer + 10 * step, answer - 10 * step].map(r));
   for (const c of candidates) {
     if (set.size >= 4) break;
-    if (Number.isInteger(c) && c >= 0 && !set.has(c)) set.add(c);
+    if (ok(c) && !set.has(key(c))) set.set(key(c), c);
   }
   let k = 3;
-  while (set.size < 4) { if (!set.has(answer + k)) set.add(answer + k); k++; }
-  return shuffle(rng, [...set]);
+  while (set.size < 4) { const c = r(answer + k * step); if (!set.has(key(c))) set.set(key(c), c); k++; }
+  return shuffle(rng, [...set.values()]);
 }
 
 function nearMisses(f: Fact): number[] {
@@ -276,14 +293,15 @@ function procTemplate(
   id: string, skillId: string, representations: Representation[],
   choose: (rng: () => number, d: number) => Record<string, number>,
   build: (p: Record<string, number>) => Made,
+  keys?: Template["keys"],
 ): Template {
   return {
-    id, version: 1, skillId, representations,
+    id, version: 1, skillId, representations, keys,
     generate(rng, d, rep) {
       const params = choose(rng, d);
       const m = build(params);
       const base = { templateId: id, templateVersion: 1, skillId, representation: rep, params, difficulty: d, answer: m.answer };
-      if (rep === "choice") return { ...base, prompt: m.prompt, input: "choice", choices: distractors(rng, m.answer, m.near) };
+      if (rep === "choice") return { ...base, prompt: m.prompt, input: "choice", choices: distractors(rng, m.answer, m.near, keys === "neg" || keys === "both") };
       if (rep === "story" && m.storyFact) return { ...base, prompt: story(rng, m.storyFact), input: "number" };
       return { ...base, prompt: m.prompt, input: "number" };
     },
@@ -512,6 +530,150 @@ function equationTemplate(): Template {
     });
 }
 
+
+// ── Åk 4–6, del 2: decimaltal, negativa tal och bråk ──
+
+/** Plus och minus med decimaltal. Tal i tiondelar, och i hundradelar när svårigheten är hög. */
+function decimalTemplate(): Template {
+  return procTemplate("ma.tal.decimal.v1", "ma.tal.decimal", ["symbol", "choice"],
+    (rng, d) => {
+      const hundredths = d >= 0.6 ? 1 : 0;
+      const sc = hundredths ? 100 : 10;
+      const hi = Math.round(sc * (4 + d * 12));
+      let x = int(rng, sc + 2, hi), y = int(rng, sc / 10 + 1, Math.max(sc / 10 + 2, Math.round(hi * 0.8)));
+      const minus = rng() < 0.5 ? 1 : 0;
+      for (let i = 0; i < 50 && (x % 10 === 0 || y % 10 === 0 || (minus && y >= x)); i++) {
+        x = int(rng, sc + 2, hi); y = int(rng, sc / 10 + 1, Math.max(sc / 10 + 2, Math.round(hi * 0.8)));
+      }
+      if (x % 10 === 0 || y % 10 === 0 || (minus && y >= x)) { x = 37; y = 14; }
+      return { x, y, minus, sc };
+    },
+    ({ x, y, minus, sc }) => {
+      const a = x / sc, b = y / sc;
+      const ans = (minus ? x - y : x + y) / sc;
+      const unit = sc === 10 ? "tiondelar" : "hundradelar";
+      return {
+        prompt: `${fmt(a)} ${minus ? "−" : "+"} ${fmt(b)} = ?`, answer: ans,
+        near: [ans + 1 / sc, ans - 1 / sc, ans + 1, ans - 1, (minus ? x + y : x + y) / sc / 10],
+        hints: [
+          "Ställ upp talen med kommatecken under kommatecken. Räkna som vanliga tal och behåll kommat på samma ställe.",
+          `Tänk ${unit}: ${x} ${unit} ${minus ? "minus" : "plus"} ${y} ${unit}. Gör om till kommatal efteråt.`,
+          `${fmt(a)} ${minus ? "−" : "+"} ${fmt(b)} = ${fmt(ans)}. Svaret är ${fmt(ans)}.`,
+        ],
+      };
+    }, "dec");
+}
+
+/** Gånger och delat med decimaltal: 1,5 × 4, 0,6 × 10, 7,2 ÷ 4. */
+function decimalMulTemplate(): Template {
+  return procTemplate("ma.mul.decimal.v1", "ma.mul.decimal", ["symbol", "choice"],
+    (rng, d) => {
+      const div = rng() < 0.3 ? 1 : 0;
+      const b = div ? int(rng, 2, 9) : rng() < 0.2 ? 10 : int(rng, 2, 3 + Math.round(d * 6));
+      let q = int(rng, 2, 8 + Math.round(d * 40));
+      let x = div ? b * q : int(rng, 2, 9 + Math.round(d * 40));
+      for (let i = 0; i < 60 && x % 10 === 0; i++) {
+        if (div) { q++; x = b * q; } else x++;
+      }
+      return { x, b, div };
+    },
+    ({ x, b, div }) => {
+      const a = x / 10;
+      const ans = div ? x / b / 10 : (x * b) / 10;
+      return {
+        prompt: `${fmt(a)} ${div ? "÷" : "×"} ${b} = ?`, answer: ans,
+        near: div ? [ans * 10, ans + 0.1, ans - 0.1, ans / 10] : [ans * 10, ans / 10, ans + 0.1, ans - 0.1, ans + 1],
+        hints: !div && b === 10 ? [
+          "Gånger tio gör varje siffra tio gånger mer värd.",
+          "Kommatecknet flyttar ett steg åt höger. Fyll på med noll om det behövs.",
+          `${fmt(a)} × 10 = ${fmt(ans)}. Svaret är ${fmt(ans)}.`,
+        ] : [
+          div ? "Dela som om det vore ett vanligt tal. Sätt ut kommatecknet på samma ställe." : "Gångra som om kommatecknet inte fanns. Räkna sedan ut hur många decimaler svaret ska ha.",
+          div ? `${x} ÷ ${b} = ${x / b}. Hur många decimaler har ${fmt(a)}?` : `${x} × ${b} = ${x * b}. ${fmt(a)} har en decimal, så svaret får också en.`,
+          `${fmt(a)} ${div ? "÷" : "×"} ${b} = ${fmt(ans)}. Svaret är ${fmt(ans)}.`,
+        ],
+      };
+    }, "dec");
+}
+
+/** Negativa tal på tallinjen: 4 − 9, −3 + 8, −2 − 5. */
+function negativeTemplate(): Template {
+  return procTemplate("ma.tal.negativa.v1", "ma.tal.negativa", ["symbol", "choice"],
+    (rng, d) => {
+      const form = d < 0.35 ? 0 : pick(rng, [0, 1, 2]);
+      const hi = 6 + Math.round(d * 14);
+      let a = int(rng, 1, hi), b = int(rng, 1, hi);
+      for (let i = 0; i < 30; i++) {
+        const v = form === 0 ? a - b : form === 1 ? -a + b : -a - b;
+        if (v !== 0) break;
+        b = int(rng, 1, hi);
+      }
+      if ((form === 0 ? a - b : form === 1 ? -a + b : -a - b) === 0) b = a + 1;
+      return { form, a, b };
+    },
+    ({ form, a, b }) => {
+      const ans = form === 0 ? a - b : form === 1 ? -a + b : -a - b;
+      const prompt = form === 0 ? `${a} − ${b} = ?` : form === 1 ? `−${a} + ${b} = ?` : `−${a} − ${b} = ?`;
+      return {
+        prompt, answer: ans, near: [-ans, a + b, -(a + b), ans + 1, ans - 1, b - a],
+        hints: [
+          "Tänk dig en tallinje. Plus går åt höger och minus åt vänster. Under noll är talen negativa.",
+          form === 0 ? `Du startar på ${a} och går ${b} steg åt vänster. Passerar du noll?`
+            : form === 1 ? `Du startar på −${a} (under noll) och går ${b} steg åt höger.`
+            : `Du startar på −${a} (under noll) och går ${b} steg till åt vänster.`,
+          `${prompt.replace("?", fmt(ans))}. Svaret är ${fmt(ans)}.`,
+        ],
+      };
+    }, "neg");
+}
+
+/** Bråk av ett antal: 3/4 av 20. */
+const PARTS: [number, number][] = [[1, 2], [1, 4], [1, 3], [1, 5], [1, 10], [3, 4], [2, 3], [2, 5], [3, 10]];
+function fractionOfTemplate(): Template {
+  return procTemplate("ma.tal.brak_del.v1", "ma.tal.brak_del", ["symbol", "choice", "story"],
+    (rng, d) => {
+      const i = pick(rng, d < 0.3 ? [0, 1, 2] : d < 0.65 ? [0, 1, 2, 3, 4, 5] : [0, 1, 2, 3, 4, 5, 6, 7, 8]);
+      let unit = int(rng, 2, 4 + Math.round(d * 12));
+      if (unit * PARTS[i][0] === PARTS[i][1]) unit++;
+      return { i, unit };
+    },
+    ({ i, unit }) => {
+      const [n, dd] = PARTS[i];
+      const total = dd * unit, ans = n * unit;
+      return {
+        prompt: `${n}/${dd} av ${total} = ?`, answer: ans, near: [unit, total - ans, ans + unit, total / 2],
+        hints: [
+          `Nämnaren ${dd} säger i hur många lika delar helheten delas. Täljaren säger hur många delar du tar.`,
+          `Dela först ${total} i ${dd} lika delar${n > 1 ? `, och ta sedan ${n} av delarna` : ""}.`,
+          `${total} ÷ ${dd} = ${unit}${n > 1 ? ` och ${unit} × ${n} = ${ans}` : ""}. Svaret är ${ans}.`,
+        ],
+        storyFact: undefined,
+      };
+    });
+}
+
+/** Likvärdiga bråk: 1/2 = ?/8 eller 2/3 = 6/?. */
+function equivalentFractionTemplate(): Template {
+  return procTemplate("ma.tal.brak_likvardiga.v1", "ma.tal.brak_likvardiga", ["symbol", "choice"],
+    (rng, d) => {
+      const dd = int(rng, 2, 5 + Math.round(d * 5));
+      const n = int(rng, 1, dd - 1);
+      return { n, dd, k: int(rng, 2, 3 + Math.round(d * 5)), askBottom: rng() < 0.4 ? 1 : 0 };
+    },
+    ({ n, dd, k, askBottom }) => {
+      const ans = askBottom ? dd * k : n * k;
+      return {
+        prompt: askBottom ? `${n}/${dd} = ${n * k}/?` : `${n}/${dd} = ?/${dd * k}`, answer: ans,
+        near: [askBottom ? n * k + dd : n + k, ans + 1, ans - 1, askBottom ? dd + k : dd * k],
+        hints: [
+          "Ett bråk blir lika mycket värt om du gångrar täljare och nämnare med samma tal.",
+          askBottom ? `Täljaren blev ${n * k} från ${n}. Gångra nämnaren ${dd} med samma tal.` : `Nämnaren blev ${dd * k} från ${dd}. Gångra täljaren ${n} med samma tal.`,
+          `Båda gångras med ${k}: ${n}/${dd} = ${n * k}/${dd * k}. Svaret är ${ans}.`,
+        ],
+      };
+    });
+}
+
 export const mathTemplates: Template[] = [
   factTemplate({ id: "ma.add.inom10.v1", skillId: "ma.add.inom10", representations: ALL,
     facts: addFacts((a, b) => a + b <= 10, 9, 9), hints: addHints }),
@@ -569,6 +731,11 @@ export const mathTemplates: Template[] = [
   precedenceTemplate(),
   percentTemplate(),
   equationTemplate(),
+  decimalTemplate(),
+  decimalMulTemplate(),
+  negativeTemplate(),
+  fractionOfTemplate(),
+  equivalentFractionTemplate(),
   countTemplate(),
   orderTemplate(),
 ];

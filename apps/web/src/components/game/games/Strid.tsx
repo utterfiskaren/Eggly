@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Clock } from "./Clock";
 import type { RoundAnswer } from "@/lib/rounds";
+import { fmt } from "@/lib/num";
 import type { BoardProps } from "./types";
 
 const FALLBACK = { maxB: 80, hit: 9, maxH: 30, baseD: 6, crit: 10, timeX: 1 };
@@ -35,10 +36,10 @@ export function Strid({ questions, seconds, hero, boss, fight = FALLBACK, onDone
       setNote(crit ? `Superslag! −${dmg}` : `Du slår bossen: −${dmg}`);
     } else {
       setHp((h) => Math.max(0, h - fight.hit));
-      setNote(value === -1 ? `Tiden tog slut. Bossen slår dig: −${fight.hit}` : `Fel. Bossen slår dig: −${fight.hit}. Svaret är ${q.answer}.`);
+      setNote(Number.isNaN(value) ? `Tiden tog slut. Bossen slår dig: −${fight.hit}` : `Fel. Bossen slår dig: −${fight.hit}. Svaret är ${fmt(q.answer)}.`);
     }
   }, [picked, over, q, idx, fight]);
-  const timeout = useCallback(() => answer(-1), [answer]);
+  const timeout = useCallback(() => answer(NaN), [answer]);
 
   useEffect(() => {
     if (picked === null || over) return;
@@ -83,7 +84,7 @@ export function Strid({ questions, seconds, hero, boss, fight = FALLBACK, onDone
             <button key={c} type="button" disabled={asked} onClick={() => answer(c)}
               className="squish squish--mjuk display"
               style={{ background: right ? "var(--mynta)" : wrong ? "var(--jordgubb)" : undefined, color: right || wrong ? "#fff" : undefined, fontSize: "var(--t-xl)" }}>
-              {c}
+              {fmt(c)}
             </button>
           );
         })}

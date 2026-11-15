@@ -20,6 +20,12 @@ const EXTRA_STOPS: ArcadeStop[] = [
   { name: "Ekvationsborgen", blurb: "Lös gåtan med x, och procent.", stage: "åk 6", skills: ["ma.alg.ekvation", "ma.tal.procent"] },
   { name: "Mästarnivån", blurb: "Allt från åk 4–6 i en enda röra.", stage: "åk 6",
     skills: ["ma.mul.flersiffrigt", "ma.div.kort", "ma.div.rest", "ma.alg.prioritering", "ma.tal.procent", "ma.alg.ekvation", "ma.add.uppstallning", "ma.sub.uppstallning"] },
+  { name: "Bråkbergen", blurb: "Bråk av ett antal, och bråk som är lika mycket värda.", stage: "åk 4–5", skills: ["ma.tal.brak_del", "ma.tal.brak_likvardiga"] },
+  { name: "Kommastigen", blurb: "Plus och minus med tal som har komma.", stage: "åk 5", skills: ["ma.tal.decimal"] },
+  { name: "Under noll", blurb: "Tal under noll: plus och minus på tallinjen.", stage: "åk 5–6", skills: ["ma.tal.negativa"] },
+  { name: "Kommagångern", blurb: "Gånger och delat med komma.", stage: "åk 6", skills: ["ma.mul.decimal", "ma.tal.decimal"] },
+  { name: "Stora provet", blurb: "Alla nya sorter blandade: komma, bråk, minus, procent och mer.", stage: "åk 6–7",
+    skills: ["ma.mul.decimal", "ma.tal.decimal", "ma.tal.negativa", "ma.tal.brak_del", "ma.tal.brak_likvardiga", "ma.alg.ekvation", "ma.tal.procent", "ma.alg.prioritering", "ma.mul.flersiffrigt", "ma.div.kort"] },
 ];
 
 const STAGES = ["förskoleklass–åk 1", "åk 1", "åk 1–2", "åk 2", "åk 2–3", "åk 3", "åk 3–4", "åk 4"];
@@ -91,6 +97,6 @@ export function arcadeEggTier(level: number, tempo: number): number {
 }
 
 /** Hjärtan per nivå, som kartans världar: fler fel tillåts på de lägsta nivåerna. */
-const LIVES = [5, 5, 4, 4, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2];
+const LIVES = [5, 5, 4, 4, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2];
 export const arcadeLives = (level: number) => LIVES[Math.max(0, Math.min(LIVES.length - 1, Math.round(level) - 1))];
 

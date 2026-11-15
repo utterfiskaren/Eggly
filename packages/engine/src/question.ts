@@ -35,6 +35,8 @@ export interface Template {
   version: number;
   skillId: string;
   representations: Representation[];
+  /** Behöver knappsatsen komma (dec) eller minus (neg)? */
+  keys?: "dec" | "neg" | "both";
   generate(rng: () => number, difficulty: number, representation: Representation, fact?: string): Question;
   /** Tre nivåer: en vink, ett stöd som delar upp, och hela lösningen. Nivå 1–2 får aldrig avslöja svaret. */
   hints(q: Question): [string, string, string];

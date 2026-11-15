@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isCorrect, mathTemplates, parseAnswer, seededRng, type Question } from "../src";
+import { fmt, isCorrect, mathTemplates, parseAnswer, seededRng, type Question } from "../src";
 import { mathSkills } from "@eggly/content";
 
 const OPS: Record<string, (a: number, b: number) => number> = {
@@ -7,9 +7,17 @@ const OPS: Record<string, (a: number, b: number) => number> = {
 };
 
 /** Kontrollerar facit genom att räkna om uppgiften från texten, oberoende av mallen. */
+const N = (t: string) => Number(t.replace(",", ".").replace("−", "-"));
+const near = (a: number, b: number) => Math.abs(a - b) < 1e-9;
 function checkByPrompt(q: Question): boolean | null {
-  let m = q.prompt.match(/^(\d+) ([+−×÷]) (\d+) = \?$/);
-  if (m) return OPS[m[2]](+m[1], +m[3]) === q.answer;
+  let m = q.prompt.match(/^(−?\d+(?:,\d+)?) ([+−×÷]) (\d+(?:,\d+)?) = \?$/);
+  if (m) return near(OPS[m[2]](N(m[1]), N(m[3])), q.answer);
+  m = q.prompt.match(/^(\d+)\/(\d+) av (\d+) = \?$/);
+  if (m) return (+m[1] * +m[3]) / +m[2] === q.answer && Number.isInteger(q.answer);
+  m = q.prompt.match(/^(\d+)\/(\d+) = \?\/(\d+)$/);
+  if (m) return +m[1] * +m[3] === q.answer * +m[2];
+  m = q.prompt.match(/^(\d+)\/(\d+) = (\d+)\/\?$/);
+  if (m) return +m[1] * q.answer === +m[3] * +m[2];
   m = q.prompt.match(/^(\d+) ([+−×÷]) \? = (\d+)$/);
   if (m) return OPS[m[2]](+m[1], q.answer) === +m[3];
   m = q.prompt.match(/^\? ([+−×÷]) (\d+) = (\d+)$/);
@@ -67,8 +75,8 @@ describe("frågemallar för matte", () => {
         let checked = 0;
         for (const rep of t.representations) for (let i = 0; i < SAMPLES; i++) {
           const q = t.generate(rng, i / SAMPLES, rep);
-          expect(Number.isInteger(q.answer), `${q.prompt} → ${q.answer}`).toBe(true);
-          expect(q.answer).toBeGreaterThanOrEqual(0);
+          if (!t.keys?.includes("dec")) expect(Number.isInteger(q.answer), `${q.prompt} → ${q.answer}`).toBe(true);
+          if (!t.keys?.includes("neg")) expect(q.answer).toBeGreaterThanOrEqual(0);
           const ok = checkByPrompt(q);
           if (ok !== null) { expect(ok, `${t.id} ${rep}: ${q.prompt} = ${q.answer}`).toBe(true); checked++; }
         }
@@ -83,7 +91,7 @@ describe("frågemallar för matte", () => {
           expect(q.choices).toBeDefined();
           expect(new Set(q.choices).size).toBe(q.choices!.length);
           expect(q.choices!.filter((c) => c === q.answer).length).toBe(1);
-          expect(q.choices!.every((c) => c >= 0)).toBe(true);
+          if (!t.keys?.includes("neg")) expect(q.choices!.every((c) => c >= 0)).toBe(true);
         }
       });
 
@@ -97,7 +105,7 @@ describe("frågemallar för matte", () => {
             const leaks = (h.match(/\d+/g) ?? []).map(Number).filter((n) => n === q.answer && !inPrompt.has(n));
             expect(leaks, `${t.id} ${rep} «${q.prompt}» ledtråd: ${h}`).toEqual([]);
           }
-          expect(h3).toContain(String(q.answer));
+          expect(h3).toContain(fmt(q.answer));
         }
       });
 
@@ -117,7 +125,12 @@ describe("frågemallar för matte", () => {
 describe("rättning", () => {
   it("är förlåtande mot hur barn skriver", () => {
     for (const s of ["7", " 7 ", "07", "7,0", "7.0", "+7"]) expect(isCorrect(s, 7), s).toBe(true);
-    for (const s of ["", "sju", "7a", "77", "-7"]) expect(isCorrect(s, 7), s).toBe(false);
+    for (const s of ["", "sju", "7a", "77", "-7", "7,5"]) expect(isCorrect(s, 7), s).toBe(false);
+    expect(isCorrect("3,5", 3.5)).toBe(true);
+    expect(isCorrect("−4", -4)).toBe(true);
+    expect(isCorrect("-4", -4)).toBe(true);
+    expect(isCorrect("0,30", 0.3)).toBe(true);
+    expect(isCorrect("4", -4)).toBe(false);
     expect(parseAnswer("1 000")).toBe(1000);
   });
 });

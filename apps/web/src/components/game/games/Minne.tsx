@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Clock } from "./Clock";
+import { fmt } from "@/lib/num";
 import type { BoardProps } from "./types";
 
 const expr = (p: string) => p.replace(/\s*=\s*\?$/, "");
@@ -13,7 +14,7 @@ const expr = (p: string) => p.replace(/\s*=\s*\?$/, "");
 export function Minne({ questions, clock, onDone }: BoardProps) {
   const pairs = questions.length;
   const [cards] = useState(() => {
-    const all = questions.flatMap((q, i) => [{ pair: i, text: expr(q.prompt) }, { pair: i, text: String(q.answer) }]);
+    const all = questions.flatMap((q, i) => [{ pair: i, text: expr(q.prompt) }, { pair: i, text: fmt(q.answer) }]);
     return all.map((c) => ({ c, r: Math.random() })).sort((a, b) => a.r - b.r).map((x) => x.c);
   });
   const [up, setUp] = useState<number[]>([]);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { fmt } from "@/lib/num";
 import type { GameProps } from "./types";
 
 const H = 300;      // fältets höjd i px
@@ -112,7 +113,7 @@ export function Fanga({ q, seconds, onAnswer, buddySvg }: GameProps) {
           <div key={`${v}-${i}`} ref={(el) => { tokRefs.current[i] = el; }}
             className="display absolute left-0 top-0 flex items-center justify-center rounded-full bg-[var(--vit)] shadow-[0_4px_0_var(--dimma)]"
             style={{ width: TS, height: TS, fontSize: "var(--t-xl)", transform: `translate(0px, ${-TS * 2}px)` }}>
-            {v}
+            {fmt(v)}
           </div>
         ))}
         <div ref={catcherRef} className="absolute bottom-0 left-0 [&>span]:block [&>span>svg]:h-full [&>span>svg]:w-full"
@@ -127,7 +128,7 @@ export function Fanga({ q, seconds, onAnswer, buddySvg }: GameProps) {
         <button type="button" className="squish squish--mjuk" onClick={() => nudge(0.15)} disabled={phase !== "play"} aria-label="Flytta fångaren åt höger">▶</button>
       </div>
       <p className="min-h-[1.5em] text-center font-semibold" role="status" style={{ color: phase === "right" ? "var(--mynta)" : "var(--plommon)" }}>
-        {phase === "right" ? "Fångad! Rätt!" : phase === "wrong" ? `Svaret är ${q.answer}.` : ""}
+        {phase === "right" ? "Fångad! Rätt!" : phase === "wrong" ? `Svaret är ${fmt(q.answer)}.` : ""}
       </p>
     </div>
   );

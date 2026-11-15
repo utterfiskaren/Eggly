@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { QuestionVisual } from "../Visuals";
 import { Clock } from "./Clock";
+import { fmt } from "@/lib/num";
 import type { GameProps } from "./types";
 
 const COLORS = ["#ffd6e7", "#cfe6ff", "#c9f0e1", "#fff3b8"];
@@ -33,14 +34,14 @@ export function Bubbel({ q, seconds, onAnswer }: GameProps) {
               className={`bubbla display mx-auto flex aspect-square w-full max-w-[130px] items-center justify-center rounded-full ${done && isPicked && !right ? "bubbla--pang" : ""}`}
               style={{ background: done && right ? "var(--mynta)" : COLORS[i % 4], color: done && right ? "#fff" : "var(--plommon)",
                 fontSize: "var(--t-2xl)", animationDelay: `${i * 0.35}s` }}
-              aria-label={`Bubbla ${c}`}>
-              {c}
+              aria-label={`Bubbla ${fmt(c)}`}>
+              {fmt(c)}
             </button>
           );
         })}
       </div>
       <p className="min-h-[1.5em] text-center font-semibold" role="status" style={{ color: ok ? "var(--mynta)" : "var(--plommon)" }}>
-        {done ? (ok ? "Pang! Rätt!" : `Rätt bubbla var ${q.answer}.`) : ""}
+        {done ? (ok ? "Pang! Rätt!" : `Rätt bubbla var ${fmt(q.answer)}.`) : ""}
       </p>
     </div>
   );

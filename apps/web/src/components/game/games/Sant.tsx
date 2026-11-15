@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { QuestionVisual } from "../Visuals";
 import { Clock } from "./Clock";
+import { fmt } from "@/lib/num";
 import type { GameProps } from "./types";
 
 /**
@@ -11,10 +12,11 @@ import type { GameProps } from "./types";
  */
 export function Sant({ q, seconds, onAnswer, index }: GameProps) {
   const shown = useMemo(() => {
-    const truth = ((index * 7 + q.answer) % 2) === 0;
+    const seed = Math.floor(Math.abs(q.answer) * 100);
+    const truth = ((index * 7 + seed) % 2) === 0;
     if (truth) return q.answer;
     const wrong = q.choices.filter((c) => c !== q.answer);
-    return wrong[(index + q.answer) % Math.max(1, wrong.length)] ?? q.answer + 1;
+    return wrong[(index + seed) % Math.max(1, wrong.length)] ?? q.answer + 1;
   }, [q, index]);
   const [said, setSaid] = useState<boolean | null>(null);
   const truth = shown === q.answer;
@@ -27,7 +29,7 @@ export function Sant({ q, seconds, onAnswer, index }: GameProps) {
     return () => window.clearTimeout(t);
   }, [done, ok, onAnswer]);
 
-  const statement = q.prompt.includes("?") && /=\s*\?$/.test(q.prompt) ? q.prompt.replace(/\?$/, String(shown)) : `${q.prompt} Svar: ${shown}`;
+  const statement = q.prompt.includes("?") && /=\s*\?$/.test(q.prompt) ? q.prompt.replace(/\?$/, fmt(shown)) : `${q.prompt} Svar: ${fmt(shown)}`;
   return (
     <div className="kort flex flex-col gap-4 p-4">
       <Clock seconds={seconds} stopped={done} onTimeout={timeout} />
@@ -40,7 +42,7 @@ export function Sant({ q, seconds, onAnswer, index }: GameProps) {
         <button type="button" className="squish" disabled={done} onClick={() => setSaid(false)}>Fel</button>
       </div>
       <p className="min-h-[1.5em] text-center font-semibold" role="status" style={{ color: ok ? "var(--mynta)" : "var(--plommon)" }}>
-        {done ? (ok ? "Precis!" : truth ? "Det stämde faktiskt!" : `Det stämde inte. Svaret är ${q.answer}.`) : ""}
+        {done ? (ok ? "Precis!" : truth ? "Det stämde faktiskt!" : `Det stämde inte. Svaret är ${fmt(q.answer)}.`) : ""}
       </p>
     </div>
   );

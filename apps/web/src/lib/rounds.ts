@@ -51,6 +51,8 @@ export interface RoundQuestion {
   visual?: Visual;
   skillTitle: string;
   hints: string[];
+  /** Knappsatsen behöver komma (dec), minus (neg) eller båda. */
+  keys?: "dec" | "neg" | "both";
   /** Vem är störst?: uppgiften att jämföra med (bara texten och svaret). */
   other?: { prompt: string; answer: number };
   /** Kiosken: texten (**fetstil**) och varans bild. Summan som ska läggas är `answer`. */
@@ -94,10 +96,10 @@ async function loadChild(childId: string): Promise<ChildModel> {
 function toRoundQuestion(p: Planned, rng: () => number): RoundQuestion {
   const q = p.question;
   const t = mathTemplates.find((x) => x.id === q.templateId);
-  const choices = q.choices?.length ? q.choices : distractors(rng, q.answer, [q.answer + 1, q.answer - 1, q.answer + 10]);
+  const choices = q.choices?.length ? q.choices : distractors(rng, q.answer, [q.answer + 1, q.answer - 1, q.answer + 10], t?.keys === "neg" || t?.keys === "both");
   return {
     prompt: q.prompt, input: q.input, answer: q.answer, choices, visual: q.visual,
-    skillTitle: KID_TITLE.get(q.skillId) ?? "", hints: t ? t.hints(q) : [],
+    skillTitle: KID_TITLE.get(q.skillId) ?? "", hints: t ? t.hints(q) : [], keys: t?.keys,
   };
 }
 

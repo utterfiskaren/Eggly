@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Clock } from "./Clock";
+import { fmt } from "@/lib/num";
 import type { GameProps } from "./types";
 
 const expr = (p: string) => p.replace(/\s*=\s*\?$/, "");
@@ -12,7 +13,7 @@ const expr = (p: string) => p.replace(/\s*=\s*\?$/, "");
  */
 export function Storre({ q, seconds, onAnswer, index }: GameProps) {
   const other = q.other ?? { prompt: q.prompt, answer: q.answer };
-  const flip = (index * 5 + q.answer) % 2 === 1;
+  const flip = (index * 5 + Math.floor(Math.abs(q.answer) * 100)) % 2 === 1;
   const mine = { p: q.prompt, a: q.answer };
   const theirs = { p: other.prompt, a: other.answer };
   const left = flip ? theirs : mine;
@@ -36,7 +37,7 @@ export function Storre({ q, seconds, onAnswer, index }: GameProps) {
         style={{ fontSize: e.p.length > 9 ? "var(--t-xl)" : "var(--t-2xl)", borderColor: mark }}
         aria-label={`${expr(e.p)}`}>
         <span>{expr(e.p)}</span>
-        {done && <span className="hjalptext" style={{ fontSize: "var(--t-md)" }}>= {e.a}</span>}
+        {done && <span className="hjalptext" style={{ fontSize: "var(--t-md)" }}>= {fmt(e.a)}</span>}
       </button>
     );
   };
@@ -48,7 +49,7 @@ export function Storre({ q, seconds, onAnswer, index }: GameProps) {
       <div className="grid grid-cols-2 gap-3">{card("l", left)}{card("r", right)}</div>
       <button type="button" className="squish squish--mjuk" disabled={done} onClick={() => setSaid("eq")}>Lika mycket</button>
       <p className="min-h-[1.5em] text-center font-semibold" role="status" style={{ color: ok ? "var(--mynta)" : "var(--plommon)" }}>
-        {done ? (ok ? "Precis!" : said === "time" ? `Tiden tog slut. ${left.a} och ${right.a}.` : `Inte riktigt. ${left.a} och ${right.a}.`) : ""}
+        {done ? (ok ? "Precis!" : said === "time" ? `Tiden tog slut. ${fmt(left.a)} och ${fmt(right.a)}.` : `Inte riktigt. ${fmt(left.a)} och ${fmt(right.a)}.`) : ""}
       </p>
     </div>
   );
