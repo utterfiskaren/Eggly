@@ -3,7 +3,7 @@ import { ARCADE_LEVELS, ARCADE_OPS, TIER_ORDER, arcadeEggTier, arcadeLives, arca
 
 describe("Alla spel", () => {
   it("har en nivå per kartstopp plus de för åk 4–6, och Blandat finns på alla", () => {
-    expect(ARCADE_LEVELS).toHaveLength(20);
+    expect(ARCADE_LEVELS).toHaveLength(31);
     for (const l of ARCADE_LEVELS) {
       expect(arcadeOps(l.level)).toContain("mix");
       expect(arcadeSkills(l.level, "mix").length).toBeGreaterThan(0);

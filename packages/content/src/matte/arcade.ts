@@ -26,6 +26,19 @@ const EXTRA_STOPS: ArcadeStop[] = [
   { name: "Kommagångern", blurb: "Gånger och delat med komma.", stage: "åk 6", skills: ["ma.mul.decimal", "ma.tal.decimal"] },
   { name: "Stora provet", blurb: "Alla nya sorter blandade: komma, bråk, minus, procent och mer.", stage: "åk 6–7",
     skills: ["ma.mul.decimal", "ma.tal.decimal", "ma.tal.negativa", "ma.tal.brak_del", "ma.tal.brak_likvardiga", "ma.alg.ekvation", "ma.tal.procent", "ma.alg.prioritering", "ma.mul.flersiffrigt", "ma.div.kort"] },
+  { name: "Måttlandet", blurb: "Omkrets, area och att byta enhet.", stage: "åk 3–5", skills: ["ma.geo.omkrets", "ma.geo.area", "ma.geo.enhetsbyte", "ma.mat.volym_vikt"] },
+  { name: "Tid och pengar", blurb: "Hur länge, växel och vad som blir kvar.", stage: "åk 4–5", skills: ["ma.mat.tidsskillnad", "ma.mat.pengar", "ma.geo.enhetsbyte"] },
+  { name: "Statistikstan", blurb: "Medelvärde, median och typvärde.", stage: "åk 5–6", skills: ["ma.stat.medelvarde", "ma.samb.proportionalitet"] },
+  { name: "Berättelsebyn", blurb: "Berättelser med flera steg, och proportion.", stage: "åk 5–6", skills: ["ma.prob.textuppgift_flera", "ma.samb.proportionalitet", "ma.mat.pengar"] },
+  { name: "Det riktigt stora provet", blurb: "Mått, tid, pengar, statistik och berättelser blandade.", stage: "åk 6–7",
+    skills: ["ma.geo.omkrets", "ma.geo.area", "ma.geo.enhetsbyte", "ma.mat.volym_vikt", "ma.mat.tidsskillnad", "ma.mat.pengar", "ma.stat.medelvarde", "ma.samb.proportionalitet", "ma.prob.textuppgift_flera", "ma.tal.procent"] },
+  { name: "Siffrornas by", blurb: "Tiotal, hundratal, tusental och stora tal.", stage: "åk 1–5", skills: ["ma.tal.positionssystem100", "ma.tal.positionssystem1000", "ma.tal.positionssystem_stora"] },
+  { name: "Huvudräkningen", blurb: "Överslag, smarta knep och lika mycket på båda sidor.", stage: "åk 3–6", skills: ["ma.rakna.huvudrakning", "ma.rakna.overslag", "ma.alg.likhetstecken"] },
+  { name: "Mönsterskogen", blurb: "Mönster, bokstäver som tal, bråk och tänk-på-ett-tal.", stage: "åk 3–6", skills: ["ma.alg.monster", "ma.alg.uttryck", "ma.prob.logik", "ma.tal.brak_jamfora"] },
+  { name: "Formernas land", blurb: "Hörn, kanter, symmetri, vinklar, längd och skala.", stage: "åk 1–6", skills: ["ma.geo.former", "ma.geo.kroppar", "ma.geo.symmetri", "ma.geo.langd", "ma.geo.vinklar", "ma.geo.skala"] },
+  { name: "Klockslottet", blurb: "Klockan, tabeller, chans, koordinater och korta berättelser.", stage: "åk 1–6", skills: ["ma.mat.klockan_hel", "ma.mat.klockan_minut", "ma.stat.tabeller", "ma.stat.chans", "ma.samb.koordinater", "ma.prob.textuppgift_ett"] },
+  { name: "Allra sista provet", blurb: "Allt det nya blandat. Sista nivån!", stage: "åk 1–7",
+    skills: ["ma.tal.positionssystem1000", "ma.tal.positionssystem_stora", "ma.rakna.huvudrakning", "ma.rakna.overslag", "ma.alg.monster", "ma.alg.uttryck", "ma.prob.logik", "ma.tal.brak_jamfora", "ma.geo.kroppar", "ma.geo.vinklar", "ma.geo.skala", "ma.mat.klockan_minut", "ma.stat.chans", "ma.samb.koordinater"] },
 ];
 
 const STAGES = ["förskoleklass–åk 1", "åk 1", "åk 1–2", "åk 2", "åk 2–3", "åk 3", "åk 3–4", "åk 4"];
@@ -98,6 +111,6 @@ export function arcadeEggTier(level: number, tempo: number): number {
 }
 
 /** Hjärtan per nivå, som kartans världar: fler fel tillåts på de lägsta nivåerna. */
-const LIVES = [5, 5, 4, 4, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2];
+const LIVES = [5, 5, 4, 4, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2];
 export const arcadeLives = (level: number) => LIVES[Math.max(0, Math.min(LIVES.length - 1, Math.round(level) - 1))];
 
