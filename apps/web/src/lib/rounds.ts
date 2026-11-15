@@ -6,8 +6,8 @@ import {
 } from "@eggly/content";
 import {
   MATH_SKILLS_WITH_TEMPLATES, distractors, emptySkill, entryGradeFor, fightNumbers, hashSeed, kioskLevel, kioskTask, krossMode,
-  mathTemplates, minneClock, newSession, pickPartner, planRound, recordAnswer, seededRng, spurtPlan, spurtStars,
-  type ChildModel, type FightNumbers, type KrossMode, type Planned, type Representation, type SessionState, type SkillState, type Visual,
+  mathTemplates, minneClock, newSession, pickPartner, planRound, practicePlan, recordAnswer, seededRng, spurtPlan, spurtStars,
+  type ChildModel, type FightNumbers, type KrossMode, type Planned, type PracticeSpec, type Representation, type SessionState, type SkillState, type Visual,
 } from "@eggly/engine";
 import { supabaseAdmin } from "./supabase/admin";
 import { clearStep, collection, openStep } from "./world";
@@ -69,6 +69,8 @@ export interface Round {
   kross?: KrossMode;
   /** Sant om omgången är ett spel från Alla spel och inte ett steg på kartan. */
   arcade?: boolean;
+  /** Sant om omgången är Öva. */
+  practice?: boolean;
   /** Minnet och Spurten: hela klockan i sekunder (0 = ingen klocka). */
   clock?: number;
   /** Spurten: så många rätt krävs. */
@@ -126,6 +128,8 @@ interface RoundSpec {
   id: string; title: string; game: GameId; tempo: number; n: number; skills: string[];
   world: number; lives: number; tier: number; index: number;
   arcade?: boolean;
+  /** Öva: barnets eget val av tabeller eller räknesätt. */
+  practice?: PracticeSpec;
 }
 
 /** Kämpen i Striden: barnets starkaste klämmis. Utan klämmis (inget ägg kläckt än) en startkatt. */
@@ -150,6 +154,12 @@ export async function startRound(childId: string, stepId: string): Promise<Round
   });
 }
 
+/** Öva: barnets eget val. Ger en omgång på tio uppgifter (färre om valet inte räcker). */
+export async function startPracticeRound(childId: string, spec: PracticeSpec, tempo: number): Promise<Round | null> {
+  const t = Math.max(0, Math.min(4, Math.round(tempo)));
+  return buildRound(childId, { id: "ova", title: "Öva", game: "rakna", tempo: t, n: 10, skills: [], world: 0, lives: 0, tier: 0, index: -1, practice: spec });
+}
+
 export interface ArcadeChoice { game: GameId; op: ArcadeOp; level: number; tempo: number }
 
 /** Alla spel: ett spel barnet valt själv. Null om valet inte stämmer (okänt spel, matteslag som inte finns på nivån). */
@@ -169,7 +179,7 @@ async function buildRound(childId: string, step: RoundSpec): Promise<Round | nul
   const cfg = GAME_CFG[played];
   const db = supabaseAdmin();
   const { data: sess, error } = await db.from("play_sessions")
-    .insert({ child_id: childId, subject: "matte", mode: "aventyr", activity: step.arcade ? step.id : `steg:${step.id}` })
+    .insert({ child_id: childId, subject: "matte", mode: "aventyr", activity: step.practice ? "ova" : step.arcade ? step.id : `steg:${step.id}` })
     .select("id").single();
   if (error || !sess) throw new Error("Omgången gick inte att starta");
   const child = await loadChild(childId);
@@ -186,7 +196,12 @@ async function buildRound(childId: string, step: RoundSpec): Promise<Round | nul
   let clock: number | undefined, goal: number | undefined, noLives = false;
   let hero: Round["hero"], boss: Round["boss"], fight: FightNumbers | undefined;
 
-  if (played === "kiosk") {
+  if (step.practice) {
+    plan = practicePlan(rng, step.practice, n);
+    if (plan.length === 0) return null;
+    questions = plan.map((p) => toRoundQuestion(p, rng));
+    noLives = true;
+  } else if (played === "kiosk") {
     free = n;
     questions = Array.from({ length: n }, () => {
       const t = kioskTask(rng, kioskLevel(step.world));
@@ -257,7 +272,7 @@ async function buildRound(childId: string, step: RoundSpec): Promise<Round | nul
   await db.from("pending_questions").insert({
     session_id: sess.id, child_id: childId, item_index: 0,
     planned: {
-      round: plan, step: step.id, free, game: played, noLives, ...(goal ? { goal } : {}),
+      round: plan, step: step.id, free, game: played, noLives, ...(goal ? { goal } : {}), ...(step.practice ? { practice: true } : {}),
       ...(step.arcade ? { arcade: { tier: step.tier, lives: step.lives, skills: step.skills } } : {}),
     },
   });
@@ -268,7 +283,7 @@ async function buildRound(childId: string, step: RoundSpec): Promise<Round | nul
       seconds: Math.round(TEMPO[step.tempo].sec * (SECONDS_X[played] ?? 1) * (fight?.timeX ?? 1) * 10) / 10,
       lives: noLives ? 0 : step.lives, tier: step.tier, index: step.index, world: step.world,
     },
-    questions, buddySvg, kross, arcade: step.arcade ? true : undefined, clock, goal, hero, boss, fight,
+    questions, buddySvg, kross, arcade: step.arcade ? true : undefined, practice: step.practice ? true : undefined, clock, goal, hero, boss, fight,
   };
 }
 
@@ -285,6 +300,8 @@ export interface RoundResult {
   /** Alla spel: äggets bild (färdig SVG) och att det inte var ett steg på kartan. */
   eggSvg?: string;
   arcade?: boolean;
+  /** Öva: ingen karta och inget ägg, bara stjärnor. */
+  practice?: boolean;
 }
 
 /**
@@ -296,12 +313,13 @@ export async function finishRound(childId: string, roundId: string, answers: Rou
   const { data: removed } = await db.from("pending_questions").delete()
     .eq("session_id", roundId).eq("child_id", childId).select("planned");
   const pending = removed?.[0]?.planned as
-    { round: Planned[]; step: string; free?: number; game?: GameId; goal?: number; noLives?: boolean; arcade?: { tier: number; lives: number; skills: string[] } } | undefined;
+    { round: Planned[]; step: string; free?: number; game?: GameId; goal?: number; noLives?: boolean; practice?: boolean; arcade?: { tier: number; lives: number; skills: string[] } } | undefined;
   if (!pending) return null;
-  const step = pending.arcade ? undefined : STEPS.find((s) => s.id === pending.step);
-  if (!pending.arcade && !step) return null;
-  const skillsFocus = pending.arcade?.skills ?? step!.skills;
-  const lives = pending.arcade?.lives ?? livesFor(step!);
+  const loose = !!pending.arcade || !!pending.practice;
+  const step = loose ? undefined : STEPS.find((s) => s.id === pending.step);
+  if (!loose && !step) return null;
+  const skillsFocus = pending.arcade?.skills ?? step?.skills ?? [];
+  const lives = pending.arcade?.lives ?? (step ? livesFor(step) : 0);
 
   const plan = pending.round;
   // Spel utan mattemallar (Kiosken, Talkross) räknas för stjärnor och steg men inte för barnets modell.
@@ -360,6 +378,7 @@ export async function finishRound(childId: string, roundId: string, answers: Rou
 
   const stars = pending.game === "spurt" ? spurtStars(right, goal) : roundStars(right, wrong);
   if (!passed) return { passed, right, wrong, stars: 0, best: 0 };
+  if (pending.practice) return { passed, right, wrong, stars, best: 0, practice: true };
   if (pending.arcade) {
     // Fritt spel ger ett ägg efter nivå och tempo. Nyckeln gör att samma omgång aldrig kan ge två ägg.
     await db.from("reward_ledger").insert({

@@ -9,3 +9,4 @@ export { mathTemplates, templatesForSkill, MATH_SKILLS_WITH_TEMPLATES, distracto
 export * from "./games";
 
 export { fmt } from "./fmt";
+export * from "./practice";

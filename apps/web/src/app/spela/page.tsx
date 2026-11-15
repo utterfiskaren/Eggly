@@ -37,6 +37,7 @@ export default async function Page() {
         <h1 style={{ fontSize: "var(--t-2xl)" }}>Hej {profile?.alias ?? "där"}!</h1>
         <div className="flex flex-wrap gap-2">
           <Link href="/spela/spel" className="squish squish--liten">Alla spel</Link>
+          <Link href="/spela/ova" className="squish squish--liten squish--mjuk">Öva</Link>
           <Link href="/spela/samling" className="squish squish--liten squish--mjuk">Min samling</Link>
         </div>
       </div>

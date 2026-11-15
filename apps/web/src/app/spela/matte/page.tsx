@@ -86,6 +86,7 @@ export default async function Page() {
           Spela steg {w.current + 1}: {w.steps[w.current].title}
         </Link>
         <Link href="/spela/spel" className="squish squish--mjuk">Alla spel</Link>
+        <Link href="/spela/ova" className="squish squish--mjuk">Öva</Link>
       </div>
 
       {TIER_ORDER.map((tier, world) => {

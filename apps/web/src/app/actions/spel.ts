@@ -2,7 +2,8 @@
 
 import { supabaseServer } from "@/lib/supabase/server";
 import { ARCADE_OPS, type ArcadeOp, type GameId } from "@eggly/content";
-import { finishRound, startArcadeRound, startRound, type Round, type RoundAnswer, type RoundResult } from "@/lib/rounds";
+import { cleanPracticeSpec } from "@eggly/engine";
+import { finishRound, startArcadeRound, startPracticeRound, startRound, type Round, type RoundAnswer, type RoundResult } from "@/lib/rounds";
 import { hatch, type HatchView } from "@/lib/world";
 
 /** Barnets id hämtas alltid från den verifierade inloggningen. */
@@ -25,6 +26,13 @@ export async function startaFrittSpel(game: string, op: string, level: number, t
   const okOp = ARCADE_OPS.find((o) => o.id === op)?.id as ArcadeOp | undefined;
   if (!okOp) return null;
   return startArcadeRound(await childId(), { game: String(game).slice(0, 12) as GameId, op: okOp, level: Number(level), tempo: Number(tempo) });
+}
+
+/** Öva: startar en omgång på det barnet valt (tabeller, plus, minus eller blandat). Null om valet är ogiltigt. */
+export async function startaOva(spec: unknown, tempo: number): Promise<Round | null> {
+  const clean = cleanPracticeSpec(spec);
+  if (!clean) return null;
+  return startPracticeRound(await childId(), clean, Number(tempo) || 0);
 }
 
 /** Skickar omgångens svar (bara rätt eller fel per uppgift, i ordning). */
