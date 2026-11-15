@@ -170,7 +170,7 @@ export async function startArcadeRound(childId: string, c: ArcadeChoice): Promis
   const skills = arcadeSkills(level, c.op);
   if (skills.length === 0) return null;
   return buildRound(childId, {
-    id: `fritt:${c.game}`, title: GAME_NAMES[c.game], game: c.game, tempo, n: 0, skills,
+    id: `fritt:${c.game}:${level}:${tempo}`, title: GAME_NAMES[c.game], game: c.game, tempo, n: 0, skills,
     world: level - 1, lives: arcadeLives(level), tier: arcadeEggTier(level, tempo), index: -1, arcade: true,
   });
 }

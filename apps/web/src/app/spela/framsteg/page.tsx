@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
+import { ARCADE_LEVELS, GAME_NAMES, TEMPO, type GameId } from "@eggly/content";
 import { requireChild } from "@/lib/child";
 import { loadProgress } from "@/lib/progress";
 
@@ -33,6 +34,30 @@ export default async function Page() {
         <div className="h-3 overflow-hidden rounded-full bg-[var(--dimma)]" role="progressbar" aria-valuemin={0} aria-valuemax={p.stepsTotal} aria-valuenow={p.stepsCleared} aria-label="Klarade steg">
           <div className="h-full rounded-full" style={{ width: `${(p.stepsCleared / p.stepsTotal) * 100}%`, background: "var(--mynta)" }} />
         </div>
+      </section>
+      <section className="kort flex flex-col gap-3 p-4" aria-label="Dina rekord">
+        <h2 className="etikett">Dina rekord</h2>
+        {p.records.length === 0 ? (
+          <p className="hjalptext">Spela ett spel under Alla spel, så dyker ditt första rekord upp här.</p>
+        ) : (
+          <>
+            <p className="hjalptext">Flest rätt du har haft på en omgång. Det är bara du mot dig själv.</p>
+            <ul className="flex flex-col gap-2">
+              {p.records.map((r) => (
+                <li key={r.game} className="flex items-center justify-between gap-3 rounded-[var(--r-md)] p-3" style={{ background: "var(--mjolkis)" }}>
+                  <span className="flex flex-col">
+                    <span className="display" style={{ fontSize: "var(--t-lg)" }}>{GAME_NAMES[r.game as GameId] ?? r.game}</span>
+                    <span className="hjalptext">
+                      {r.level ? `${ARCADE_LEVELS[r.level - 1]?.name ?? `Nivå ${r.level}`}${r.tempo !== undefined ? `, ${TEMPO[r.tempo]?.name.toLowerCase()}` : ""} · ` : ""}{r.rounds} {r.rounds === 1 ? "omgång" : "omgångar"}
+                    </span>
+                  </span>
+                  <span className="display" style={{ fontSize: "var(--t-xl)", color: "var(--mynta)" }} aria-label={`${r.best} rätt som mest`}>{r.best} rätt</span>
+                </li>
+              ))}
+            </ul>
+            <Link href="/spela/spel" className="squish squish--mjuk self-start">Slå ett rekord</Link>
+          </>
+        )}
       </section>
       <section className="kort flex flex-col gap-3 p-4" aria-label="Gångertabeller">
         <h2 className="etikett">Gångertabeller</h2>

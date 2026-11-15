@@ -11,3 +11,4 @@ export * from "./games";
 export { fmt } from "./fmt";
 export * from "./practice";
 export * from "./progress";
+export * from "./records";
