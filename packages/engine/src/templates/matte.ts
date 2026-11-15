@@ -1445,7 +1445,7 @@ export const mathTemplates: Template[] = [
 function countTemplate(): Template {
   const id = "ma.tal.antal10.v1", skillId = "ma.tal.antal10";
   return {
-    id, version: 1, skillId, representations: ["visual", "choice"],
+    id, version: 1, skillId, representations: ["visual", "choice"], alwaysVisual: true,
     generate(rng, d, rep) {
       const n = Math.min(10, Math.max(1, int(rng, 1 + Math.round(d * 5), 4 + Math.round(d * 6))));
       const layout: "frame" | "scatter" = d > 0.45 && rng() < 0.7 ? "scatter" : "frame";

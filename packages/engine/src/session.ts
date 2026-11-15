@@ -233,7 +233,9 @@ export function nextQuestion(
   },
 ): Planned {
   try {
-    const available = ctx.available.filter((id) => mathTemplates.some((t) => t.skillId === id));
+    // Spel som inte ritar bilder får inga färdigheter vars uppgifter alltid har en bild.
+    const noPictures = !!ctx.representations && !ctx.representations.includes("visual");
+    const available = ctx.available.filter((id) => mathTemplates.some((t) => t.skillId === id && !(noPictures && t.alwaysVisual)));
     if (available.length === 0) throw new Error("inga färdigheter tillgängliga");
     const pick = chooseSkill(child, session, available, ctx.now, ctx.rng);
     const t = templateFor(pick.skillId);
@@ -264,13 +266,13 @@ export function nextQuestion(
     }
     return { question: q, reason: pick.reason, itemRating: toBeta(q.difficulty) + offset };
   } catch {
-    return fallbackQuestion(ctx.rng);
+    return fallbackQuestion(ctx.rng, ctx.representations);
   }
 }
 
-export function fallbackQuestion(rng: () => number): Planned {
+export function fallbackQuestion(rng: () => number, reps?: Representation[]): Planned {
   const t = templateFor("ma.add.inom10");
-  const q = t.generate(rng, 0.1, "visual");
+  const q = t.generate(rng, 0.1, reps && !reps.includes("visual") ? "symbol" : "visual");
   return { question: q, reason: "fallback", itemRating: toBeta(q.difficulty) };
 }
 

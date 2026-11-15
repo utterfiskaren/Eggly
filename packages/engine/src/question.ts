@@ -39,6 +39,8 @@ export interface Template {
   version: number;
   skillId: string;
   representations: Representation[];
+  /** Varje uppgift från mallen har en bild som måste visas (även i flervalsform). Spel som inte ritar bilder hoppar över den. */
+  alwaysVisual?: boolean;
   /** Behöver knappsatsen komma (dec) eller minus (neg)? */
   keys?: "dec" | "neg" | "both";
   generate(rng: () => number, difficulty: number, representation: Representation, fact?: string): Question;
