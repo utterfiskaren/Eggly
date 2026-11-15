@@ -17,7 +17,7 @@ export interface Species {
   special?: string;
 }
 
-export const TIERS: { id: string; name: string }[] = art.TIERS;
+export const TIERS = art.TIERS as unknown as { id: string; name: string; egg: [string, string, string]; stat: string }[];
 /** Nivåernas ordning från lättast till svårast. RANK[nivå] = plats i ordningen. */
 export const TIER_ORDER: number[] = art.TORDER;
 export const TIER_RANK: number[] = art.RANK;
@@ -61,13 +61,18 @@ export function hatchRoll(owned: string[], maxRank: number, rnd: () => number = 
   const top = Math.max(0, Math.min(TIER_ORDER.length - 1, Math.floor(maxRank)));
   const r = rnd();
   const rank = Math.max(0, top - (r < 0.5 ? 0 : r < 0.85 ? 1 : 2));
-  let tier = TIER_ORDER[rank];
-  let pool = HATCHABLE.filter((s) => s.tier === tier);
-  if (pool.length === 0) { tier = TIER_ORDER[0]; pool = HATCHABLE.filter((s) => s.tier === tier); }
+  return hatchFromTier(owned, TIER_ORDER[rank], rnd);
+}
+
+/** Kläcker ett ägg av en bestämd nivå (som äggen från stegen på kartan). Nya arter kommer oftare. */
+export function hatchFromTier(owned: string[], tier: number, rnd: () => number = Math.random): Hatched {
+  let t = tier;
+  let pool = HATCHABLE.filter((s) => s.tier === t);
+  if (pool.length === 0) { t = TIER_ORDER[0]; pool = HATCHABLE.filter((s) => s.tier === t); }
   const have = new Set(owned);
   const w = pool.map((s) => (have.has(s.id) ? 1 : 3));
   let x = rnd() * w.reduce((a, b) => a + b, 0);
   let pick = pool[0];
   for (let i = 0; i < pool.length; i++) { x -= w[i]; if (x <= 0) { pick = pool[i]; break; } }
-  return { id: pick.id, tier, treats: art.rollTreats(tier), seed: Math.floor(rnd() * 2147483647) };
+  return { id: pick.id, tier: t, treats: art.rollTreats(t), seed: Math.floor(rnd() * 2147483647) };
 }

@@ -1,22 +1,61 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { GAME_NAMES, TIERS, TIER_ORDER, WORLD_BOSSES, eggSvg } from "@eggly/content";
 import { Logo } from "@/components/Logo";
-import { EggArt } from "@/components/game/Squishy";
+import { ScrollToCurrent } from "@/components/game/ScrollToCurrent";
 import { requireChild } from "@/lib/child";
-import { loadWorld, maxEggRank } from "@/lib/world";
-import { TIER_ORDER } from "@eggly/content";
+import { loadWorld, type StepView } from "@/lib/world";
 
 export const metadata: Metadata = { title: "Matteön" };
 
-/** Ön ritad som en mjuk klump, med stigen mellan stoppen. Stoppen själva är länkar ovanpå. */
-function IslandBackdrop({ points }: { points: [number, number][] }) {
-  const path = points.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x} ${y}`).join(" ");
+/* Stigen i varje värld ritas i rader om fem som slingrar fram och tillbaka. */
+const PER_ROW = 5, W = 500, ROW_H = 96, PAD_X = 56;
+function pos(k: number) {
+  const row = Math.floor(k / PER_ROW), col = k % PER_ROW;
+  const c = row % 2 === 0 ? col : PER_ROW - 1 - col;
+  const x = PAD_X + (c * (W - 2 * PAD_X)) / (PER_ROW - 1);
+  const y = 52 + row * ROW_H + (c % 2 ? 18 : 0);
+  return { x, y };
+}
+
+function WorldPath({ steps, current, color, dark }: { steps: StepView[]; current: number; color: string; dark: string }) {
+  const pts = steps.map((s) => pos(s.k));
+  const h = pts[pts.length - 1].y + 70;
+  const d = pts.map((p, i) => `${i ? "L" : "M"}${p.x} ${p.y}`).join(" ");
   return (
-    <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden="true">
-      <rect width="100" height="100" fill="#d7ebff" />
-      <path d="M8 92 C-2 70 6 40 14 22 C22 4 48 2 66 4 C86 6 98 22 96 46 C94 70 98 88 80 96 C60 102 22 104 8 92 Z" fill="#bfe8d6" />
-      <path d="M12 88 C4 68 10 42 18 26 C26 10 48 8 64 9 C82 10 92 24 91 46 C90 68 93 84 78 91 C60 97 26 98 12 88 Z" fill="#9fdcc2" />
-      <path d={path} fill="none" stroke="#fff" strokeWidth="1.6" strokeDasharray="2.4 2" strokeLinecap="round" vectorEffect="non-scaling-stroke" style={{ strokeWidth: 6 }} />
+    <svg viewBox={`0 0 ${W} ${h}`} className="block w-full" role="list" aria-label="Stegen i världen">
+      <path d={d} fill="none" stroke="#fff" strokeWidth="14" strokeLinecap="round" strokeLinejoin="round" opacity=".8" />
+      <path d={d} fill="none" stroke={dark} strokeWidth="3" strokeDasharray="2 10" strokeLinecap="round" opacity=".5" />
+      {steps.map((s, i) => {
+        const { x, y } = pts[i];
+        const here = s.index === current;
+        const r = s.boss ? 30 : s.mini ? 25 : 22;
+        const label = `Steg ${s.index + 1}: ${s.title}, ${GAME_NAMES[s.game]}. ${s.stars ? `${s.stars} av 5 stjärnor.` : s.open ? "Inte klarat än." : "Låst."}${here ? " Du är här." : ""}`;
+        const body = (
+          <g className={here ? "steg-nu" : undefined} style={{ transformOrigin: `${x}px ${y}px` }}>
+            <circle cx={x} cy={y + 4} r={r} fill={dark} opacity=".35" />
+            <circle cx={x} cy={y} r={r} fill={!s.open ? "#d9d4e3" : here ? "var(--jordgubb)" : s.stars ? color : "#fff"}
+              stroke={here ? "#fff" : dark} strokeWidth={here ? 5 : 3} />
+            {s.open ? (
+              <text x={x} y={y + 6} textAnchor="middle" style={{ fontFamily: "var(--font-display)", fontSize: s.boss ? 20 : 17, fontWeight: 600 }}
+                fill={here ? "#fff" : "var(--plommon)"}>{s.boss ? "★" : s.index + 1}</text>
+            ) : (
+              <path d={`M${x - 7} ${y - 1}h14v10h-14z M${x - 4} ${y - 1}v-4a4 4 0 0 1 8 0v4`} fill="none" stroke="#8f86a3" strokeWidth="2.5" />
+            )}
+            {s.stars > 0 && (
+              <text x={x} y={y + r + 15} textAnchor="middle" style={{ fontSize: 11, letterSpacing: 1 }} fill="#c98a12">
+                {"★".repeat(s.stars)}<tspan fill="#fff">{"★".repeat(5 - s.stars)}</tspan>
+              </text>
+            )}
+          </g>
+        );
+        return s.open ? (
+          <a key={s.id} href={`/spela/matte/steg/${s.id}`} aria-label={label} role="listitem" id={here ? "steg-nu" : undefined} className="steg-lank">
+            <circle cx={x} cy={y} r={34} fill="transparent" />
+            {body}
+          </a>
+        ) : <g key={s.id} role="listitem" aria-label={label}>{body}</g>;
+      })}
     </svg>
   );
 }
@@ -24,80 +63,54 @@ function IslandBackdrop({ points }: { points: [number, number][] }) {
 export default async function Page() {
   const me = await requireChild();
   const w = await loadWorld(me);
-  const current = w.stops.filter((s) => s.open).at(-1);
+  const curWorld = w.steps[w.current].world;
   return (
-    <main id="innehall" className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-4 px-4 pb-12 pt-5">
+    <main id="innehall" className="mx-auto flex min-h-dvh max-w-2xl flex-col gap-4 px-4 pb-16 pt-5">
       <header className="flex items-center justify-between gap-3">
         <Link href="/spela" className="flex min-h-[44px] items-center"><Logo size={30} /></Link>
         <h1 className="display" style={{ color: "var(--mynta)", fontSize: "var(--t-xl)" }}>Matteön</h1>
       </header>
 
       <div className="kort flex items-center gap-4 p-4">
-        <EggArt tier={TIER_ORDER[maxEggRank(w)]} cracks={w.eggs > 0 ? 2 : 0} size={56} />
+        <span className="inline-block h-14 w-11 shrink-0 [&>svg]:h-full [&>svg]:w-full" aria-hidden="true"
+          dangerouslySetInnerHTML={{ __html: eggSvg(w.eggs[0] ?? TIER_ORDER[curWorld], w.eggs.length ? 2 : 0) }} />
         <div className="flex-1">
-          <p className="font-semibold"><span aria-hidden="true">⭐</span> {w.totalStars} stjärnor</p>
-          <p className="hjalptext">
-            {w.eggs > 0 ? `Du har ${w.eggs === 1 ? "ett ägg" : `${w.eggs} ägg`} som vill kläckas!` : `Nästa ägg är ${Math.round(w.eggProgress * 100)} % klart.`}
-          </p>
+          <p className="font-semibold">{w.cleared} av {w.steps.length} steg klara · <span aria-hidden="true">⭐</span> {w.totalStars}</p>
+          <p className="hjalptext">{w.eggs.length ? `Du har ${w.eggs.length === 1 ? "ett ägg" : `${w.eggs.length} ägg`} att kläcka!` : "Klara ett steg så får du ett ägg."}</p>
         </div>
-        <Link href="/spela/samling" className={`squish squish--liten ${w.eggs > 0 ? "" : "squish--mjuk"}`}>
-          {w.eggs > 0 ? "Kläck" : "Samlingen"}
-        </Link>
+        <Link href="/spela/samling" className={`squish squish--liten ${w.eggs.length ? "" : "squish--mjuk"}`}>{w.eggs.length ? "Kläck" : "Samlingen"}</Link>
       </div>
 
-      <section aria-labelledby="karta" className="relative overflow-hidden rounded-[var(--r-lg)] border-2 border-[var(--dimma)] aspect-[4/5] sm:aspect-[16/11]">
-        <h2 id="karta" className="sr-only">Kartan. Välj ett stopp.</h2>
-        <IslandBackdrop points={w.stops.map((s) => [s.x, s.y])} />
-        <ol className="absolute inset-0">
-          {w.stops.map((s) => {
-            const here = s.id === current?.id;
-            const label = `${s.name}. ${s.open ? `${s.stars} av 3 stjärnor.` : "Låst."}${here ? " Du är här." : ""}`;
-            const egg = (
-              <span className="relative flex h-14 w-12 items-center justify-center display text-lg"
-                style={{ borderRadius: "var(--agg)", background: s.open ? (here ? "var(--jordgubb)" : "var(--vit)") : "#cfd8dc",
-                  color: here ? "#fff" : "var(--plommon)", border: "3px solid var(--plommon)" }}>
-                {s.open ? s.index + 1 : <LockIcon />}
-              </span>
-            );
-            return (
-              <li key={s.id} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${s.x}%`, top: `${s.y}%` }}>
-                {s.open ? (
-                  <Link href={`/spela/matte/${s.id}`} aria-label={label}
-                    className={`kort--klick flex min-h-[56px] min-w-[56px] flex-col items-center gap-0.5 rounded-[var(--r-md)] p-1 ${here ? "agg-gung" : ""}`}>
-                    {egg}
-                    <Stars n={s.stars} />
-                    <span className="hidden rounded-full bg-white/90 px-2 text-xs font-semibold sm:block">{s.name}</span>
-                  </Link>
-                ) : (
-                  <span aria-label={label} role="img" className="flex flex-col items-center gap-0.5 p-1 opacity-80">{egg}</span>
-                )}
-              </li>
-            );
-          })}
-        </ol>
-      </section>
+      <Link href={`/spela/matte/steg/${w.steps[w.current].id}`} className="squish self-center">
+        Spela steg {w.current + 1}: {w.steps[w.current].title}
+      </Link>
 
-      {current && (
-        <Link href={`/spela/matte/${current.id}`} className="squish self-center">Spela på {current.name}</Link>
-      )}
-      <p className="hjalptext text-center">Två stjärnor på ett stopp öppnar nästa. Du kan alltid gå tillbaka och spela igen.</p>
+      {TIER_ORDER.map((tier, world) => {
+        const steps = w.steps.filter((s) => s.world === world);
+        const T = TIERS[tier];
+        const done = steps.filter((s) => s.stars > 0).length;
+        const open = steps[0].open;
+        const head = (
+          <div className="flex items-center gap-3 p-3">
+            <span className="inline-block h-12 w-10 shrink-0 [&>svg]:h-full [&>svg]:w-full" aria-hidden="true" dangerouslySetInnerHTML={{ __html: eggSvg(tier) }} />
+            <div className="flex-1">
+              <h2 className="display" style={{ fontSize: "var(--t-lg)" }}>{T.name}-världen</h2>
+              <p className="hjalptext">{open ? `${done} av ${steps.length} klara · boss: ${WORLD_BOSSES[tier]}` : "Låst. Klara stegen före för att komma hit."}</p>
+            </div>
+          </div>
+        );
+        const style = { background: `linear-gradient(180deg, ${T.egg[0]}, ${T.egg[1]}55)`, borderColor: T.egg[1] };
+        if (!open) return <section key={tier} className="rounded-[var(--r-lg)] border-2 opacity-60" style={style} aria-label={`${T.name}-världen, låst`}>{head}</section>;
+        const path = <WorldPath steps={steps} current={w.current} color={T.egg[1]} dark={T.egg[2]} />;
+        return world === curWorld ? (
+          <section key={tier} className="overflow-hidden rounded-[var(--r-lg)] border-2" style={style} aria-label={`${T.name}-världen`}>{head}{path}</section>
+        ) : (
+          <details key={tier} className="overflow-hidden rounded-[var(--r-lg)] border-2" style={style}>
+            <summary className="cursor-pointer list-none">{head}</summary>{path}
+          </details>
+        );
+      })}
+      <ScrollToCurrent />
     </main>
-  );
-}
-
-function Stars({ n }: { n: number }) {
-  return (
-    <span aria-hidden="true" className="text-sm leading-none" style={{ color: "#c98a12" }}>
-      {"★".repeat(n)}<span style={{ color: "#fff" }}>{"★".repeat(3 - n)}</span>
-    </span>
-  );
-}
-
-function LockIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-      <rect x="5" y="11" width="14" height="10" rx="3" fill="var(--plommon)" />
-      <path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="var(--plommon)" strokeWidth="2.5" />
-    </svg>
   );
 }

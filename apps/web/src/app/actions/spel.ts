@@ -1,9 +1,8 @@
 "use server";
 
 import { supabaseServer } from "@/lib/supabase/server";
-import { answerQuestion, startSession, takeHint, type AnswerResult, type ClientQuestion } from "@/lib/play";
+import { finishRound, startRound, type Round, type RoundAnswer, type RoundResult } from "@/lib/rounds";
 import { hatch, type HatchView } from "@/lib/world";
-import type { Mode } from "@eggly/engine";
 
 /** Barnets id hämtas alltid från den verifierade inloggningen. */
 async function childId(): Promise<string> {
@@ -15,28 +14,19 @@ async function childId(): Promise<string> {
   return claims.sub;
 }
 
-const MODES: Mode[] = ["mysigt", "aventyr", "klurigt"];
-
-export async function startMatte(mode: Mode, stopId: string): Promise<ClientQuestion> {
-  return startSession(await childId(), MODES.includes(mode) ? mode : "aventyr", String(stopId).slice(0, 40));
+/** Startar en omgång på ett öppet steg. Null om steget inte är öppet för barnet. */
+export async function startaSteg(stepId: string): Promise<Round | null> {
+  return startRound(await childId(), String(stepId).slice(0, 20));
 }
 
-/** Kläcker ett ägg. Ger klämmisen (med färdig bild), eller null om inget ägg fanns. */
+/** Skickar omgångens svar (bara rätt eller fel per uppgift, i ordning). */
+export async function avslutaSteg(roundId: string, answers: RoundAnswer[], completed: boolean): Promise<RoundResult | null> {
+  const clean = (Array.isArray(answers) ? answers : []).slice(0, 60)
+    .map((a) => ({ correct: a?.correct === true, hint: Number(a?.hint) || 0 }));
+  return finishRound(await childId(), String(roundId).slice(0, 40), clean, completed === true);
+}
+
+/** Kläcker det äldsta ägget. Ger klämmisen (med färdig bild), eller null om inget ägg fanns. */
 export async function klackAgg(): Promise<HatchView | null> {
-  // Ingen omladdning av sidan här: då försvinner kläckningen innan barnet hunnit se klämmisen.
-  // Kläckaren laddar om sidan själv när barnet trycker vidare.
-  // Kartan och samlingen renderas alltid på nytt, så inget behöver rensas.
   return hatch(await childId());
-}
-
-export async function svara(sessionId: string, answer: string): Promise<AnswerResult | null> {
-  return answerQuestion(await childId(), sessionId, String(answer).slice(0, 20));
-}
-
-export async function visaLosningen(sessionId: string): Promise<AnswerResult | null> {
-  return answerQuestion(await childId(), sessionId, "", true);
-}
-
-export async function ledtrad(sessionId: string) {
-  return takeHint(await childId(), sessionId);
 }

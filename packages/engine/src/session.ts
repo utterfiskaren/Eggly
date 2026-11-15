@@ -127,8 +127,9 @@ function toBeta(d: number): number {
 }
 
 /** Frågetyp: den som använts minst i passet, med visuellt stöd vid återhämtning och i Mysigt. */
-function chooseRepresentation(t: Template, session: SessionState, reason: Reason, rng: () => number): Representation {
-  const reps = t.representations;
+function chooseRepresentation(t: Template, session: SessionState, reason: Reason, rng: () => number, allowed?: Representation[]): Representation {
+  const ok = allowed ? t.representations.filter((r) => allowed.includes(r)) : [];
+  const reps = ok.length ? ok : t.representations;
   if ((reason === "scaffold_recovery" || session.mode === "mysigt") && reps.includes("visual")) return "visual";
   if (session.mode === "klurigt") {
     const harder = reps.filter((r) => r === "story" || r === "missing");
@@ -221,7 +222,13 @@ function chooseSkill(child: ChildModel, session: SessionState, available: string
 /** Väljer och skapar nästa uppgift. Faller aldrig: vid fel blir det en trygg reservuppgift (AT-13). */
 export function nextQuestion(
   child: ChildModel, session: SessionState,
-  ctx: { now: number; rng: () => number; available: string[]; itemRating?: (templateId: string) => number },
+  ctx: {
+    now: number; rng: () => number; available: string[]; itemRating?: (templateId: string) => number;
+    /** Frågetyper som spelet kan visa, t.ex. bara siffersvar i ett snabbt spel. Saknas de i mallen används mallens egna. */
+    representations?: Representation[];
+    /** Inga upprepningar alls (planerade omgångar). */
+    unique?: boolean;
+  },
 ): Planned {
   try {
     const available = ctx.available.filter((id) => mathTemplates.some((t) => t.skillId === id));
@@ -240,13 +247,19 @@ export function nextQuestion(
     for (let i = session.items.length - 1; i >= 0 && session.items[i].correct === false; i--) wrongRow++;
     const afterWrong = pick.reason === "scaffold_recovery" ? 0 : -Math.min(0.3, 0.12 * wrongRow);
     const d = Math.min(1, Math.max(0, toD(beta) + pick.dShift + afterWrong + (pick.reason === "scaffold_recovery" ? 0 : guard)));
-    const rep = chooseRepresentation(t, session, pick.reason, ctx.rng);
+    const rep = chooseRepresentation(t, session, pick.reason, ctx.rng, ctx.representations);
 
     // Samma uppgift ska inte komma två gånger i samma pass.
     const seen = new Set(session.items.map((it) => it.factKey ?? it.prompt));
     let q = t.generate(ctx.rng, d, rep, pick.fact);
     if (pick.fact && q.difficulty > d + 0.25) q = t.generate(ctx.rng, d, rep);
     for (let i = 0; i < 12 && seen.has(q.factKey ?? q.prompt); i++) q = t.generate(ctx.rng, d, rep);
+    // I en planerad omgång (minispel) får samma uppgift aldrig komma två gånger. Räcker inte talen på
+    // den här nivån vidgas svårigheten lite i taget, oftast åt det lättare hållet.
+    for (let i = 0; ctx.unique && i < 24 && seen.has(q.factKey ?? q.prompt); i++) {
+      const spread = 0.03 * (i + 1);
+      q = t.generate(ctx.rng, Math.min(1, Math.max(0, d + (i % 3 === 2 ? spread / 2 : -spread))), rep);
+    }
     return { question: q, reason: pick.reason, itemRating: toBeta(q.difficulty) + offset };
   } catch {
     return fallbackQuestion(ctx.rng);
@@ -297,4 +310,33 @@ export function recordAnswer(
     expected: res.expected,
     frustrationGuard: guardLeft > 0,
   };
+}
+
+/**
+ * Planerar en hel omgång i förväg, för minispel där svaren måste rättas direkt i webbläsaren.
+ * Motorn väljer som om barnet svarar rätt (bara i passets minne, inte i barnets modell), så att
+ * omgången varierar och kan gå vidare till nästa färdighet. Barnets modell uppdateras först när
+ * de riktiga svaren kommer, med recordAnswer, i samma ordning.
+ */
+export function planRound(
+  child: ChildModel, session: SessionState, n: number,
+  ctx: Parameters<typeof nextQuestion>[2],
+): Planned[] {
+  const out: Planned[] = [];
+  let s = session;
+  for (let i = 0; i < n; i++) {
+    const p = nextQuestion(child, s, { ...ctx, unique: true });
+    out.push(p);
+    s = {
+      ...s,
+      items: [...s.items, {
+        skillId: p.question.skillId, templateId: p.question.templateId, factKey: p.question.factKey,
+        prompt: `${p.question.representation}:${p.question.prompt}`, reason: p.reason,
+        difficulty: p.question.difficulty, correct: true, hintLevel: 0,
+      }],
+      newSkills: s.newSkills + (stateOf(child, p.question.skillId).status === "not_seen"
+        && !s.items.some((it) => it.skillId === p.question.skillId) ? 1 : 0),
+    };
+  }
+  return out;
 }

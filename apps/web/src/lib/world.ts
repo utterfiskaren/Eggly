@@ -1,134 +1,108 @@
 import "server-only";
 import { randomInt } from "node:crypto";
 import {
-  MATTE_STOPS, TIERS, eggProgress, eggsAvailable, hatchRoll, openStops, speciesById, squishySvg, stopStars,
-  type Treats, type WorldStop,
+  STEPS, TIERS, hatchFromTier, openUpTo, speciesById, squishySvg, type Step, type Treats,
 } from "@eggly/content";
-import { entryGradeFor } from "@eggly/engine";
 import { supabaseAdmin } from "./supabase/admin";
 
 /**
  * Matteöns karta, ägg och klämmisar på servern. Barnets id kommer alltid från den verifierade
- * inloggningen. Inget här går att köpa: ägg tjänas bara in med stjärnor från spelet.
+ * inloggningen. Inget här går att köpa: ägg får man bara genom att klara steg på kartan.
+ *
+ * Framstegen sparas i eggly.world_progress (ö «matte»): `stars` är steg-id → bästa stjärnor (1–5).
+ * Ägg och kläckningar ligger i belöningsloggen: en rad «egg» per intjänat ägg (ref = nivå) och en
+ * rad «squishy» per kläckning. Äggen kläcks i den ordning de tjänades in.
  */
 
-export interface StopView extends WorldStop { index: number; stars: number; open: boolean }
+export interface StepView extends Step { stars: number; open: boolean }
 export interface WorldView {
-  stops: StopView[];
+  steps: StepView[];
+  /** Index för det steg barnet är på (nästa att klara). */
+  current: number;
   totalStars: number;
-  eggs: number;
-  eggProgress: number;
-  hatched: number;
+  /** Okläckta ägg, äldst först (nivåer). */
+  eggs: number[];
+  cleared: number;
 }
 
-async function totals(childId: string) {
-  const { data } = await supabaseAdmin().from("reward_totals").select("kind, total").eq("child_id", childId);
-  const by = Object.fromEntries((data ?? []).map((r) => [r.kind as string, r.total as number]));
-  return { stars: by.stars ?? 0, hatched: by.squishy ?? 0 };
-}
+/** Kläckningar av ägg från stegen. Äldre kläckningar (stjärnägg under fas 1c) räknas inte av här. */
+const HATCH_REASON = "kläckt ur steg-ägg";
 
-/** Stopp som en lärare har öppnat för barnet eller för hela klassen. Senaste beslutet per stopp gäller. */
-async function teacherOpened(childId: string): Promise<string[]> {
-  const db = supabaseAdmin();
-  const { data: classes } = await db.from("class_members").select("class_id").eq("child_id", childId);
-  const classIds = (classes ?? []).map((c) => c.class_id as string);
-  if (classIds.length === 0) return [];
-  const { data } = await db.from("unlocks").select("gate_id, unlocked, child_id, created_at")
-    .eq("island", "matte").in("class_id", classIds).order("created_at", { ascending: true });
-  const state = new Map<string, boolean>();
-  for (const r of data ?? []) if (r.child_id === null || r.child_id === childId) state.set(r.gate_id as string, r.unlocked as boolean);
-  return [...state.entries()].filter(([, v]) => v).map(([k]) => k);
-}
+const rnd = () => randomInt(0, 1_000_000_000) / 1_000_000_000;
 
-async function progressRow(childId: string): Promise<Record<string, number>> {
+export async function clearedSteps(childId: string): Promise<Record<string, number>> {
   const { data } = await supabaseAdmin().from("world_progress").select("stars")
     .eq("child_id", childId).eq("island", "matte").maybeSingle();
   return (data?.stars as Record<string, number> | undefined) ?? {};
 }
 
-async function skillStatus(childId: string): Promise<Record<string, string>> {
-  const { data } = await supabaseAdmin().from("child_skill_state").select("skill_id, status").eq("child_id", childId);
-  return Object.fromEntries((data ?? []).map((r) => [r.skill_id as string, r.status as string]));
+/** Okläckta ägg i den ordning de tjänades in. */
+async function unhatchedEggs(childId: string): Promise<number[]> {
+  const { data } = await supabaseAdmin().from("reward_ledger").select("kind, ref, amount, reason")
+    .eq("child_id", childId).in("kind", ["egg", "squishy"]).order("id", { ascending: true });
+  const eggs: number[] = [];
+  let hatched = 0;
+  for (const r of data ?? []) {
+    if (r.kind === "egg") for (let i = 0; i < (r.amount as number); i++) eggs.push(Number(r.ref ?? 0));
+    else if (r.kind === "squishy" && r.reason === HATCH_REASON) hatched += r.amount as number;
+  }
+  return eggs.slice(hatched);
 }
 
-async function grade(childId: string): Promise<number> {
-  const { data } = await supabaseAdmin().from("profiles").select("age_band").eq("id", childId).single();
-  return entryGradeFor(data?.age_band as string | null | undefined);
+async function starTotal(childId: string): Promise<number> {
+  const { data } = await supabaseAdmin().from("reward_totals").select("total").eq("child_id", childId).eq("kind", "stars").maybeSingle();
+  return (data?.total as number | undefined) ?? 0;
 }
 
 export async function loadWorld(childId: string): Promise<WorldView> {
-  const [stars, status, g, opened, t] = await Promise.all([
-    progressRow(childId), skillStatus(childId), grade(childId), teacherOpened(childId), totals(childId),
-  ]);
-  const open = openStops({ grade: g, stars, skillStatus: status, teacherOpened: opened });
+  const [cleared, eggs, totalStars] = await Promise.all([clearedSteps(childId), unhatchedEggs(childId), starTotal(childId)]);
+  const current = openUpTo(cleared);
   return {
-    stops: MATTE_STOPS.map((s, i) => ({ ...s, index: i, stars: stars[s.id] ?? 0, open: i < open })),
-    totalStars: t.stars,
-    eggs: eggsAvailable(t.stars, t.hatched),
-    eggProgress: eggProgress(t.stars),
-    hatched: t.hatched,
+    steps: STEPS.map((s) => ({ ...s, stars: cleared[s.id] ?? 0, open: s.index <= current })),
+    current, totalStars, eggs, cleared: Object.keys(cleared).length,
   };
 }
 
-/** Stoppet om det finns och är öppet för barnet, annars null. */
-export async function openStop(childId: string, stopId: string): Promise<StopView | null> {
-  const world = await loadWorld(childId);
-  return world.stops.find((s) => s.id === stopId && s.open) ?? null;
+/** Steget om det finns och är öppet för barnet, annars null. */
+export async function openStep(childId: string, stepId: string): Promise<Step | null> {
+  const s = STEPS.find((x) => x.id === stepId);
+  if (!s) return null;
+  return s.index <= openUpTo(await clearedSteps(childId)) ? s : null;
 }
 
-export interface StopResult {
-  stars: number;
-  best: number;
-  /** Namnet på ett stopp som öppnades av det här passet. */
-  opened?: string;
-  eggs: number;
-}
-
-/** Sparar stoppets stjärnor efter ett avslutat pass. Det bästa resultatet behålls. */
-export async function finishStop(childId: string, stopId: string, r: { correct: number; clean: number; total: number }): Promise<StopResult> {
-  const before = await loadWorld(childId);
-  const stars = stopStars(r.correct, r.clean, r.total);
-  const current = await progressRow(childId);
-  const best = Math.max(current[stopId] ?? 0, stars);
-  const next = { ...current, [stopId]: best };
-  const openBefore = before.stops.filter((s) => s.open).length;
-  await supabaseAdmin().from("world_progress").upsert({
-    child_id: childId, island: "matte", stars: next, node: openBefore - 1, updated_at: new Date().toISOString(),
+/** Sparar ett klarat steg (bästa stjärnorna behålls) och ger ett ägg från stegets värld. */
+export async function clearStep(childId: string, step: Step, stars: number, roundId: string): Promise<{ best: number; first: boolean }> {
+  const db = supabaseAdmin();
+  const cleared = await clearedSteps(childId);
+  const first = !(cleared[step.id] > 0);
+  const best = Math.max(cleared[step.id] ?? 0, stars);
+  await db.from("world_progress").upsert({
+    child_id: childId, island: "matte", stars: { ...cleared, [step.id]: best },
+    node: Math.max(step.index, openUpTo(cleared) - 1), updated_at: new Date().toISOString(),
   });
-  const after = await loadWorld(childId);
-  const openAfter = after.stops.filter((s) => s.open).length;
-  if (openAfter !== openBefore) {
-    await supabaseAdmin().from("world_progress").update({ node: openAfter - 1 }).eq("child_id", childId).eq("island", "matte");
-  }
-  return {
-    stars, best,
-    opened: openAfter > openBefore ? after.stops[openAfter - 1].name : undefined,
-    eggs: after.eggs,
-  };
+  // Ett ägg per klarad omgång. Nyckeln gör att samma omgång aldrig kan ge två ägg.
+  await db.from("reward_ledger").insert({
+    idempotency_key: `${roundId}:egg`, child_id: childId, kind: "egg", amount: 1, ref: String(step.tier), reason: "steg klarat",
+  });
+  return { best, first };
 }
 
-/**
- * Kläcker ett ägg. Belöningsloggen har en unik nyckel per kläckning, så ett dubbelklick eller två
- * flikar samtidigt kan aldrig ge två klämmisar för samma ägg.
- */
 export interface HatchView { id: string; name: string; tierName: string; txt: string; svg: string }
 
-/** Bästa äggnivån barnet kan få: en nivå per öppet stopp på kartan (Brons på första stoppet). */
-export function maxEggRank(world: WorldView): number {
-  return Math.max(0, world.stops.filter((s) => s.open).length - 1);
-}
-
+/**
+ * Kläcker det äldsta ägget. Belöningsloggen har en unik nyckel per kläckning, så ett dubbelklick
+ * eller två flikar samtidigt kan aldrig ge två klämmisar för samma ägg.
+ */
 export async function hatch(childId: string): Promise<HatchView | null> {
   const db = supabaseAdmin();
-  const world = await loadWorld(childId);
-  const t = { stars: world.totalStars, hatched: world.hatched };
-  if (eggsAvailable(t.stars, t.hatched) < 1) return null;
+  const eggs = await unhatchedEggs(childId);
+  if (eggs.length === 0) return null;
+  const { count } = await db.from("reward_ledger").select("id", { count: "exact", head: true })
+    .eq("child_id", childId).eq("kind", "squishy").eq("reason", HATCH_REASON);
   const { data: owned } = await db.from("owned_squishies").select("squishy_id").eq("child_id", childId);
-  const rnd = () => randomInt(0, 1_000_000_000) / 1_000_000_000;
-  const pick = hatchRoll((owned ?? []).map((o) => o.squishy_id as string), maxEggRank(world), rnd);
-  const n = t.hatched + 1;
+  const pick = hatchFromTier((owned ?? []).map((o) => o.squishy_id as string), eggs[0], rnd);
   const { error } = await db.from("reward_ledger").insert({
-    idempotency_key: `${childId}:hatch:${n}`, child_id: childId, kind: "squishy", amount: 1, ref: pick.id, reason: "ägg kläckt",
+    idempotency_key: `${childId}:stegagg:${(count ?? 0) + 1}`, child_id: childId, kind: "squishy", amount: 1, ref: pick.id, reason: HATCH_REASON,
   });
   if (error) return null; // någon annan begäran hann kläcka just det här ägget
   await db.from("owned_squishies").insert({

@@ -5,7 +5,7 @@ import { Logo } from "@/components/Logo";
 import { Hatcher } from "@/components/game/Hatcher";
 import { EggArt, SquishyArt } from "@/components/game/Squishy";
 import { requireChild } from "@/lib/child";
-import { collection, loadWorld, maxEggRank } from "@/lib/world";
+import { collection, loadWorld } from "@/lib/world";
 
 export const metadata: Metadata = { title: "Min samling" };
 
@@ -13,8 +13,8 @@ export default async function Page() {
   const me = await requireChild();
   const [w, owned] = await Promise.all([loadWorld(me), collection(me)]);
   const kinds = new Set(owned.map((o) => o.squishyId));
-  const eggTier = TIER_ORDER[maxEggRank(w)];
-  // Ett ägg spricker lite mer för varje tryck. Bättre ägg behöver några fler tryck.
+  const eggTier = w.eggs[0] ?? TIER_ORDER[w.steps[w.current].world];
+  // Ett ägg spricker lite mer för varje tryck.
   const eggSvgs = [0, 1, 2, 3].map((c) => eggSvg(eggTier, c));
   // Finaste nivån först, så att de sällsynta syns högst upp.
   const sorted = [...owned].sort((a, b) => (TIER_RANK[speciesById(b.squishyId)?.tier ?? 0] - TIER_RANK[speciesById(a.squishyId)?.tier ?? 0]));
@@ -27,10 +27,10 @@ export default async function Page() {
       </header>
       <h1 style={{ fontSize: "var(--t-2xl)" }}>Min samling</h1>
 
-      {w.eggs > 0 ? <Hatcher eggs={w.eggs} eggSvgs={eggSvgs} /> : (
+      {w.eggs.length > 0 ? <Hatcher eggs={w.eggs.length} eggSvgs={eggSvgs} /> : (
         <div className="kort flex items-center gap-4 p-4">
           <EggArt tier={eggTier} size={56} />
-          <p>Nästa ägg är {Math.round(w.eggProgress * 100)} % klart. Spela på Matteön för att samla stjärnor.</p>
+          <p>Klara ett steg på Matteön så får du ett nytt ägg.</p>
         </div>
       )}
 

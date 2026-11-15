@@ -164,3 +164,15 @@ describe("pass på ett stopp på kartan", () => {
     expect(seen.size).toBeGreaterThanOrEqual(2);
   });
 });
+
+describe("omgång planerad i förväg (minispel)", () => {
+  it("ger n olika uppgifter och respekterar frågetyperna", async () => {
+    const { newSession, planRound, seededRng } = await import("../src");
+    const child = { entryGrade: 2, skills: {} } as import("../src").ChildModel;
+    const session = newSession("r", "aventyr", { skills: ["ma.add.inom10", "ma.sub.inom10"], source: "child_choice" });
+    const plan = planRound(child, session, 10, { now: Date.UTC(2026, 10, 16), rng: seededRng(3), available: ["ma.add.inom10", "ma.sub.inom10"], representations: ["symbol"] });
+    expect(plan).toHaveLength(10);
+    expect(new Set(plan.map((p) => p.question.prompt)).size).toBe(10);
+    expect(plan.every((p) => p.question.representation === "symbol")).toBe(true);
+  });
+});
