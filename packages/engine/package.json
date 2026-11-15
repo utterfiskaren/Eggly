@@ -1,0 +1,11 @@
+{
+  "name": "@eggly/engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": { "test": "vitest run" },
+  "dependencies": { "@eggly/content": "workspace:*" },
+  "devDependencies": { "vitest": "^3.2.4", "typescript": "^5.9.0" }
+}

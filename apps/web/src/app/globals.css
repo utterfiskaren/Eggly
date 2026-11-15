@@ -1,0 +1,134 @@
+@import "tailwindcss";
+
+/*
+  Eggly – designsystem v1 (fas 0)
+  Tes: "kläm-mjukt". Allt ska kännas som en squishy i handen: runt, pösigt, och det ger efter när man trycker.
+  En signatur: knappar och kort som trycks ihop (squish) när man trycker. Allt annat är lugnt.
+  Två ansikten av samma märke: spelet (färgstarkt, stort) och portalen (vitt, tätt, färg bara som information).
+*/
+
+:root {
+  /* Färger */
+  --plommon: #2a1b3d;        /* text och linjer */
+  --plommon-2: #5b4a72;      /* dämpad text, minst 4,5:1 mot mjolkis */
+  --mjolkis: #f6f3ff;        /* bakgrund i spelet */
+  --vit: #ffffff;
+  --jordgubb: #e8336f;       /* märkesfärg och primärknapp */
+  --jordgubb-mork: #b8204f;
+  --citron: #ffd23f;         /* stjärnor och belöning, aldrig text */
+  --mynta: #1f9e78;          /* Matteön */
+  --himmel: #2f7fe0;         /* Ordön (svenska) */
+  --apelsin: #e0661f;        /* Språkön (engelska) */
+  --dimma: #e7e1f5;          /* kantlinjer och tomma ytor */
+  --fel: #c62828;
+
+  /* Typskala – sju steg, inga andra */
+  --t-xs: 12px; --t-sm: 14px; --t-md: 16px; --t-lg: 18px;
+  --t-xl: 22px; --t-2xl: 28px; --t-3xl: 40px;
+
+  /* Avstånd */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px;
+  --s-5: 24px; --s-6: 32px; --s-7: 48px;
+
+  /* Träffytor: barn får större */
+  --hit: 44px; --hit-barn: 56px;
+
+  /* Former */
+  --r-sm: 12px; --r-md: 20px; --r-lg: 28px; --r-pill: 999px;
+  --agg: 50% 50% 46% 46% / 58% 58% 42% 42%;   /* äggform */
+
+  --font-display: "Fredoka Variable", ui-rounded, system-ui, sans-serif;
+  --font-body: "Atkinson Hyperlegible Next", system-ui, sans-serif;
+}
+
+@theme inline {
+  --color-plommon: var(--plommon);
+  --color-mjolkis: var(--mjolkis);
+  --color-jordgubb: var(--jordgubb);
+  --color-citron: var(--citron);
+  --color-mynta: var(--mynta);
+  --color-himmel: var(--himmel);
+  --color-apelsin: var(--apelsin);
+  --color-dimma: var(--dimma);
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+}
+
+html { -webkit-text-size-adjust: 100%; }
+body {
+  background: var(--mjolkis);
+  color: var(--plommon);
+  font-family: var(--font-body);
+  font-size: var(--t-md);
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+h1, h2, h3, .display { font-family: var(--font-display); line-height: 1.15; font-weight: 600; letter-spacing: -0.01em; }
+
+:focus-visible { outline: 3px solid var(--himmel); outline-offset: 3px; border-radius: 6px; }
+
+/* ── Signaturen: squish ───────────────────────────────────── */
+.squish {
+  --lift: 6px;
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2);
+  min-height: var(--hit-barn); padding: 0 var(--s-5);
+  border-radius: var(--r-pill);
+  font-family: var(--font-display); font-size: var(--t-lg); font-weight: 600;
+  background: var(--jordgubb); color: var(--vit);
+  box-shadow: 0 var(--lift) 0 var(--jordgubb-mork);
+  transform: translateY(0);
+  transition: transform 90ms ease-out, box-shadow 90ms ease-out;
+  cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.squish:active { transform: translateY(var(--lift)) scaleX(1.03) scaleY(0.94); box-shadow: 0 0 0 var(--jordgubb-mork); }
+.squish:disabled { opacity: 0.5; cursor: not-allowed; }
+.squish--mjuk { background: var(--vit); color: var(--plommon); box-shadow: 0 var(--lift) 0 var(--dimma); border: 2px solid var(--dimma); }
+.squish--liten { min-height: var(--hit); font-size: var(--t-md); --lift: 4px; padding: 0 var(--s-4); }
+
+.kort {
+  background: var(--vit); border-radius: var(--r-lg);
+  box-shadow: 0 6px 0 var(--dimma); border: 2px solid var(--dimma);
+}
+.kort--klick { transition: transform 90ms ease-out, box-shadow 90ms ease-out; cursor: pointer; }
+.kort--klick:active { transform: translateY(6px) scaleY(0.97); box-shadow: 0 0 0 var(--dimma); }
+
+.falt {
+  width: 100%; min-height: var(--hit-barn); padding: 0 var(--s-4);
+  border-radius: var(--r-md); border: 2px solid var(--dimma); background: var(--vit);
+  font-size: var(--t-lg); color: var(--plommon);
+}
+.falt:focus-visible { border-color: var(--himmel); outline-offset: 0; }
+.etikett { font-weight: 600; font-size: var(--t-md); display: block; margin-bottom: var(--s-2); }
+.hjalptext { font-size: var(--t-sm); color: var(--plommon-2); }
+.felruta { background: #fdecec; color: var(--fel); border-radius: var(--r-md); padding: var(--s-3) var(--s-4); font-weight: 600; }
+
+/* ── Portalen: lugnare och tätare ─────────────────────────── */
+.portal { background: #fbfaff; }
+.portal .squish { min-height: var(--hit); font-size: var(--t-md); --lift: 4px; padding: 0 var(--s-4); }
+.portal .falt { min-height: var(--hit); font-size: var(--t-md); }
+
+@media (prefers-reduced-motion: reduce) {
+  .squish, .kort--klick { transition: none; }
+  .squish:active, .kort--klick:active { transform: none; }
+}
+
+/* ── Startsidans ägg ── */
+.agg-gung { transform-origin: 50% 95%; animation: gung 4s ease-in-out infinite; }
+@keyframes gung { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
+@media (prefers-reduced-motion: reduce) { .agg-gung { animation: none; } }
+
+/* Textlänkar får också en träffyta på 44 px */
+.lank { display: inline-flex; align-items: center; min-height: var(--hit); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+
+/* ── WIG-grinden 15/11: hover, rubriker, säkra ytor, pekskärm ── */
+h1, h2, h3 { text-wrap: balance; }
+body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+button, a, .squish, .kort--klick { touch-action: manipulation; }
+@media (hover: hover) {
+  .squish:hover { filter: brightness(1.06); }
+  .squish--mjuk:hover { border-color: var(--plommon-2); filter: none; }
+  .kort--klick:hover { border-color: var(--plommon-2); }
+  .lank:hover { color: var(--jordgubb); }
+}
+.hoppa { position: absolute; left: -9999px; top: 8px; }
+.hoppa:focus { left: 8px; z-index: 50; background: var(--vit); padding: var(--s-2) var(--s-4); border-radius: var(--r-md); }
