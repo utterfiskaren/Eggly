@@ -63,8 +63,7 @@ export function ArcadeSetup({ game, levels, ops, opsByLevel, lives, tempos, tier
             </div>
             <p className="mt-2"><strong>Nivå {here.level}: {here.name}</strong> <span className="hjalptext">(ungefär {here.stage})</span></p>
             <p className="hjalptext">{here.blurb}{lives[level - 1] > 0 && <> Hjärtan: <span aria-label={`${lives[level - 1]}`}>{"♥".repeat(lives[level - 1])}</span></>}</p>
-            <p className="hjalptext mt-1">Fler nivåer kommer när fler sorters uppgifter är klara.</p>
-          </div>
+                      </div>
           <div>
             <h2 className="etikett">Tid</h2>
             <div className="flex flex-wrap gap-2" role="group" aria-label="Tempo">

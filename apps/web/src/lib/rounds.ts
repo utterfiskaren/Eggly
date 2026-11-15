@@ -1,6 +1,6 @@
 import "server-only";
 import {
-  GAME_NAMES, STEPS, TEMPO, TIER_RANK, WORLD_BOSSES, arcadeEggTier, arcadeLives, arcadeSkills, bossSvg, eggSvg, mathSkills, roundStars,
+  GAME_NAMES, STEPS, TEMPO, TIER_RANK, WORLD_BOSSES, ARCADE_LEVELS, arcadeEggTier, arcadeLives, arcadeSkills, bossSvg, eggSvg, mathSkills, roundStars,
   speciesById, squishySvg, squishyStats, tierBase,
   type ArcadeOp, type GameId, type Step, type Stats,
 } from "@eggly/content";
@@ -153,7 +153,7 @@ export interface ArcadeChoice { game: GameId; op: ArcadeOp; level: number; tempo
 /** Alla spel: ett spel barnet valt själv. Null om valet inte stämmer (okänt spel, matteslag som inte finns på nivån). */
 export async function startArcadeRound(childId: string, c: ArcadeChoice): Promise<Round | null> {
   const level = Math.round(c.level), tempo = Math.round(c.tempo);
-  if (!BUILT.includes(c.game) || !(level >= 1 && level <= 8) || !(tempo >= 0 && tempo <= 4)) return null;
+  if (!BUILT.includes(c.game) || !(level >= 1 && level <= ARCADE_LEVELS.length) || !(tempo >= 0 && tempo <= 4)) return null;
   const skills = arcadeSkills(level, c.op);
   if (skills.length === 0) return null;
   return buildRound(childId, {

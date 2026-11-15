@@ -260,6 +260,258 @@ const ALL: Representation[] = ["symbol", "missing", "choice", "visual", "story"]
 
 // ── Mallar ──────────────────────────────────────────────────
 
+
+// ── Åk 4–6: uppställning, flersiffrigt, kort division, rest, avrundning, räkneordning, procent, ekvationer ──
+
+const EXTRA_REPS: Representation[] = ["symbol", "choice", "story"];
+
+/** Det en procedurmall ger för givna tal: texten, facit, vanliga fel och ledtrådarna. */
+interface Made { prompt: string; answer: number; near: number[]; hints: [string, string, string]; storyFact?: Fact }
+
+/**
+ * Gemensam byggare. `choose` väljer talen (och är den enda som använder slump), `build` räknar ut allt
+ * från talen. Ledtrådar byggs om från sparade `params`, så de stämmer även om frågan kommer från lagring.
+ */
+function procTemplate(
+  id: string, skillId: string, representations: Representation[],
+  choose: (rng: () => number, d: number) => Record<string, number>,
+  build: (p: Record<string, number>) => Made,
+): Template {
+  return {
+    id, version: 1, skillId, representations,
+    generate(rng, d, rep) {
+      const params = choose(rng, d);
+      const m = build(params);
+      const base = { templateId: id, templateVersion: 1, skillId, representation: rep, params, difficulty: d, answer: m.answer };
+      if (rep === "choice") return { ...base, prompt: m.prompt, input: "choice", choices: distractors(rng, m.answer, m.near) };
+      if (rep === "story" && m.storyFact) return { ...base, prompt: story(rng, m.storyFact), input: "number" };
+      return { ...base, prompt: m.prompt, input: "number" };
+    },
+    hints: (q) => build(q.params).hints,
+  };
+}
+
+const digitsOf = (n: number) => ({ e: n % 10, t: Math.floor(n / 10) % 10 });
+
+/** Plus och minus med uppställning: 3–4 siffror. Svårigheten styr storlek och hur många växlingar det blir. */
+function stackedTemplate(op: "+" | "−"): Template {
+  const skillId = op === "+" ? "ma.add.uppstallning" : "ma.sub.uppstallning";
+  return procTemplate(`${skillId}.v1`, skillId, EXTRA_REPS,
+    (rng, d) => {
+      let a = 0, b = 0;
+      for (let tries = 0; tries < 200; tries++) {
+        const top = 300 + Math.round(d * 9400);
+        a = int(rng, 120, Math.max(130, top));
+        b = int(rng, 101, Math.max(110, Math.min(a - 1, Math.round(top * 0.8))));
+        if (op === "+" ? a + b > 9999 : b >= a || a - b < 20) continue;
+        if (b % 10 === 0) continue;
+        const hasCarry = op === "+" ? (a % 10) + (b % 10) >= 10 : (a % 10) < (b % 10);
+        if (d > 0.5 && !hasCarry) continue;
+        break;
+      }
+      if (op === "+" ? a + b > 9999 : b >= a || a - b < 20) { a = 345; b = 128; }
+      return { a, b };
+    },
+    ({ a, b }) => {
+      const ans = op === "+" ? a + b : a - b;
+      const x = digitsOf(a), y = digitsOf(b);
+      const hints: [string, string, string] = op === "+"
+        ? [
+          "Skriv talen under varandra så att entalen står under entalen. Börja med entalen.",
+          `Entalen: ${x.e} + ${y.e} = ${x.e + y.e}${x.e + y.e >= 10 ? ", alltså en tia att ta med" : ""}. Fortsätt sedan med tiotalen och hundratalen.`,
+          `${a} + ${b} = ${ans}. Svaret är ${ans}.`,
+        ]
+        : [
+          "Skriv talen under varandra. Börja med entalen. Är det övre entalet för litet måste du växla från tiotalet.",
+          x.e < y.e ? `Entalen: ${x.e + 10} − ${y.e} = ${x.e + 10 - y.e} efter att du växlat en tia. Tiotalet ovanför blir en mindre.` : `Entalen: ${x.e} − ${y.e} = ${x.e - y.e}. Ta sedan tiotalen och hundratalen.`,
+          `${a} − ${b} = ${ans}. Svaret är ${ans}.`,
+        ];
+      const near = op === "+" ? [ans - 10, ans + 10, ans - 100, ans + 100] : [ans + 10, ans - 10, ans + 100, ans - 100];
+      return { prompt: `${a} ${op} ${b} = ?`, answer: ans, near, hints, storyFact: { key: "", a, b, op, answer: ans, score: 0 } };
+    });
+}
+
+/** Gånger med flersiffriga tal: tvåsiffrigt × ensiffrigt först, sedan tvåsiffrigt × tvåsiffrigt. */
+function bigMulTemplate(): Template {
+  return procTemplate("ma.mul.flersiffrigt.v1", "ma.mul.flersiffrigt", EXTRA_REPS,
+    (rng, d) => {
+      let a = 13, b = 4;
+      for (let tries = 0; tries < 100; tries++) {
+        if (d < 0.35) { a = int(rng, 12, 12 + Math.round(d * 120)); b = int(rng, 2, 6); }
+        else if (d < 0.7) { a = int(rng, 15, 99); b = int(rng, 3, 9); }
+        else { a = int(rng, 100, 100 + Math.round(d * 400)); b = rng() < 0.5 ? int(rng, 3, 9) : int(rng, 12, 12 + Math.round(d * 30)); }
+        if (a % 10 !== 0 && b % 10 !== 0 && a * b <= 9999) break;
+        a = 13; b = 4;
+      }
+      return { a, b };
+    },
+    ({ a, b }) => {
+      const ans = a * b;
+      const bt = Math.floor(b / 10) * 10, be = b % 10;
+      const at = a - (a % 10);
+      const hints: [string, string, string] = bt === 0
+        ? [
+          `Dela upp ${a} i tiotal och ental (och hundratal om det finns) och gångra varje del för sig.`,
+          `${at} × ${b} = ${at * b} och ${a % 10} × ${b} = ${(a % 10) * b}. Lägg ihop delarna.`,
+          `${at * b} + ${(a % 10) * b} = ${ans}. Svaret är ${ans}.`,
+        ]
+        : [
+          `Dela upp ${b} i ${bt} och ${be}, och gångra ${a} med varje del.`,
+          `${a} × ${bt} = ${a * bt} och ${a} × ${be} = ${a * be}. Lägg ihop delarna.`,
+          `${a * bt} + ${a * be} = ${ans}. Svaret är ${ans}.`,
+        ];
+      return { prompt: `${a} × ${b} = ?`, answer: ans, near: [(a % 10) * b + at, ans + 10, ans - 10, ans + a, ans - b], hints,
+        storyFact: { key: "", a: b, b: a, op: "×", answer: ans, score: 0 } };
+    });
+}
+
+/** Kort division utan rest: tvåsiffrig eller tresiffrig kvot. */
+function shortDivTemplate(): Template {
+  return procTemplate("ma.div.kort.v1", "ma.div.kort", EXTRA_REPS,
+    (rng, d) => ({ b: int(rng, 2, 3 + Math.round(d * 6)), q: int(rng, 11, 15 + Math.round(d * 150)) }),
+    ({ b, q }) => {
+      const a = b * q;
+      return {
+        prompt: `${a} ÷ ${b} = ?`, answer: q, near: [q + 1, q - 1, q + 10, q - 10, a - b],
+        hints: [
+          `Dela talet i delar som ${b}-tabellen passar. Börja längst till vänster.`,
+          `Tänk gånger: ${b} × ? = ${a}. Pröva dig fram med ${b}-tabellen.`,
+          `${b} × ${q} = ${a}, så ${a} ÷ ${b} = ${q}. Svaret är ${q}.`,
+        ],
+        storyFact: { key: "", a, b, op: "÷", answer: q, score: 0 },
+      };
+    });
+}
+
+/** Division med rest. Ibland frågas hur många hela, ibland vad som blir över. */
+function remainderTemplate(): Template {
+  return procTemplate("ma.div.rest.v1", "ma.div.rest", ["symbol", "choice"],
+    (rng, d) => {
+      const b = int(rng, 2, 4 + Math.round(d * 5));
+      return { b, q: int(rng, 2, 6 + Math.round(d * 10)), r: int(rng, 1, b - 1), askRest: rng() < 0.4 ? 1 : 0 };
+    },
+    ({ b, q, r, askRest }) => {
+      const a = b * q + r;
+      const hints: [string, string, string] = askRest
+        ? [
+          `Hur många hela ${b} ryms i ${a}? Det som blir över är resten.`,
+          `${b} × ${q} = ${b * q}. Hur mycket fattas upp till ${a}?`,
+          `${a} − ${b * q} = ${r}. Resten är ${r}.`,
+        ]
+        : [
+          `Vilket tal i ${b}-tabellen ligger närmast under ${a}, utan att passera?`,
+          `Resten är ${r}, så ${a - r} är exakt ${b} gånger något. Vad?`,
+          `${b} × ${q} = ${a - r} och ${a - r} + ${r} = ${a}. Svaret är ${q}.`,
+        ];
+      return {
+        prompt: askRest ? `${a} ÷ ${b} = ${q} rest ?` : `${a} ÷ ${b} = ? rest ${r}`,
+        answer: askRest ? r : q,
+        near: askRest ? [q, r + 1, r - 1, b - 1] : [r, q + 1, q - 1, Math.floor(a / 2)],
+        hints,
+      };
+    });
+}
+
+/** Avrunda till tiotal, hundratal eller tusental. 5 och uppåt avrundas uppåt. */
+function roundingTemplate(): Template {
+  return procTemplate("ma.tal.avrunda.v1", "ma.tal.avrunda", ["symbol", "choice"],
+    (rng, d) => {
+      const unit = d < 0.4 ? 10 : d < 0.75 ? 100 : 1000;
+      const lo = unit === 10 ? 12 : unit === 100 ? 120 : 1200;
+      const hi = unit === 10 ? 20 + Math.round(d * 180) : unit === 100 ? 300 + Math.round(d * 900) : 3000 + Math.round(d * 6900);
+      let n = int(rng, lo, Math.max(lo + 10, hi));
+      while (n % unit === 0) n++;
+      return { n, unit };
+    },
+    ({ n, unit }) => {
+      const ans = Math.round(n / unit) * unit;
+      const name = unit === 10 ? "tiotal" : unit === 100 ? "hundratal" : "tusental";
+      const lookAt = unit === 10 ? "entalssiffran" : unit === 100 ? "tiotalssiffran" : "hundratalssiffran";
+      const digit = Math.floor((n % unit) / (unit / 10));
+      return {
+        prompt: `Avrunda ${n} till närmaste ${name}`, answer: ans,
+        near: [ans - unit, ans + unit, n - (n % unit), n - (n % unit) + unit],
+        hints: [
+          `Titta på ${lookAt} i ${n}: den bestämmer om du går upp eller ner.`,
+          `Är siffran ${digit} fem eller mer går du upp till nästa ${name}, annars stannar du.`,
+          `${n} avrundas till ${ans}. Svaret är ${ans}.`,
+        ],
+      };
+    });
+}
+
+/** Räkneordning: gånger före plus och minus, parenteser först av allt. */
+function precedenceTemplate(): Template {
+  return procTemplate("ma.alg.prioritering.v1", "ma.alg.prioritering", ["symbol", "choice"],
+    (rng, d) => {
+      const form = d < 0.4 ? 0 : d < 0.7 ? pick(rng, [0, 1, 2]) : pick(rng, [1, 2, 3]);
+      const big = 3 + Math.round(d * 7);
+      const a = int(rng, 2, 4 + Math.round(d * 20)), b = int(rng, 2, big), c = int(rng, 2, big);
+      // form 2: a × b − s (s mindre än a × b). form 3: t − b × c (t större än b × c).
+      const s = int(rng, 1, Math.max(1, a * b - 1));
+      let t = b * c + int(rng, 1, 9 + a);
+      if (t - b * c === b * c) t++;
+      return { form, a, b, c, s, t };
+    },
+    ({ form, a, b, c, s, t }) => {
+      let prompt: string, ans: number, step: string;
+      if (form === 0) { prompt = `${a} + ${b} × ${c} = ?`; ans = a + b * c; step = `${b} × ${c} = ${b * c}`; }
+      else if (form === 1) { prompt = `(${a} + ${b}) × ${c} = ?`; ans = (a + b) * c; step = `(${a} + ${b}) = ${a + b}`; }
+      else if (form === 2) { prompt = `${a} × ${b} − ${s} = ?`; ans = a * b - s; step = `${a} × ${b} = ${a * b}`; }
+      else { prompt = `${t} − ${b} × ${c} = ?`; ans = t - b * c; step = `${b} × ${c} = ${b * c}`; }
+      return {
+        prompt, answer: ans, near: [ans + 1, ans - 1, ans + a, a + b + c, a * b + c],
+        hints: [
+          "Parenteser räknas först. Sedan gånger och delat. Plus och minus kommer sist.",
+          `Börja med ${step}. Räkna sedan vidare med resten av uttrycket.`,
+          `${prompt.replace("?", String(ans))}. Svaret är ${ans}.`,
+        ],
+      };
+    });
+}
+
+/** Procent av ett tal. De vanliga procenten är bråk i förklädnad: 50 % är hälften, 25 % en fjärdedel. */
+const PERCENTS: [number, number, number][] = [[50, 2, 1], [10, 10, 1], [25, 4, 1], [20, 5, 1], [75, 4, 3], [5, 20, 1], [30, 10, 3], [40, 10, 4], [60, 10, 6]];
+function percentTemplate(): Template {
+  return procTemplate("ma.tal.procent.v1", "ma.tal.procent", ["symbol", "choice"],
+    (rng, d) => {
+      const i = pick(rng, d < 0.3 ? [0, 1, 2] : d < 0.6 ? [0, 1, 2, 3, 4] : [0, 1, 2, 3, 4, 5, 6, 7, 8]);
+      const [, div, mult] = PERCENTS[i];
+      let unit = int(rng, 2, 4 + Math.round(d * 17));
+      if (unit * mult === div) unit++;
+      return { i, unit };
+    },
+    ({ i, unit }) => {
+      const [p, div, mult] = PERCENTS[i];
+      const base = div * unit, ans = unit * mult;
+      return {
+        prompt: `${p} % av ${base} = ?`, answer: ans, near: [unit, base - ans, ans + unit, ans * 2],
+        hints: [
+          p === 5 || (p % 10 === 0 && p !== 50) ? "Börja med en tiondel (tio procent) och bygg vidare." : "Procent är bråk i förklädnad: femtio procent är hälften, tjugofem procent en fjärdedel.",
+          `Dela ${base} med ${div}${mult > 1 ? ` och gångra sedan med ${mult}` : ""}.`,
+          `${base} ÷ ${div} = ${unit}${mult > 1 ? ` och ${unit} × ${mult} = ${ans}` : ""}. Svaret är ${ans}.`,
+        ],
+      };
+    });
+}
+
+/** Enkla ekvationer: x + a = c, x − a = c, a × x = c och a × x + b = c. Svaret är x. */
+function equationTemplate(): Template {
+  return procTemplate("ma.alg.ekvation.v1", "ma.alg.ekvation", ["symbol", "choice"],
+    (rng, d) => {
+      const form = d < 0.3 ? pick(rng, [0, 1]) : d < 0.65 ? pick(rng, [0, 1, 2]) : pick(rng, [2, 3]);
+      return { form, x: int(rng, 3, 7 + Math.round(d * 20)), a: int(rng, 2, 4 + Math.round(d * 6)), b: int(rng, 1, 5 + Math.round(d * 20)) };
+    },
+    ({ form, x, a, b }) => {
+      let prompt: string, h1: string, h2: string;
+      if (form === 0) { prompt = `x + ${b} = ${x + b}, x = ?`; h1 = `Det som händer med x ska göras ogjort: plus ${b} ångras med minus ${b}.`; h2 = `x = ${x + b} − ${b}`; }
+      else if (form === 1) { prompt = `x − ${b} = ${x - b}, x = ?`; h1 = `Minus ${b} ångras med plus ${b}.`; h2 = `x = ${x - b} + ${b}`; }
+      else if (form === 2) { prompt = `${a} × x = ${a * x}, x = ?`; h1 = `${a} × x betyder ${a} stycken x. Gör tvärtom: dela.`; h2 = `x = ${a * x} ÷ ${a}`; }
+      else { prompt = `${a} × x + ${b} = ${a * x + b}, x = ?`; h1 = `Ångra i omvänd ordning: plus ${b} kommer sist, så ta bort ${b} först.`; h2 = `${a} × x = ${a * x}. Dela sedan med ${a}.`; }
+      return { prompt, answer: x, near: [x + 1, x - 1, x + b, a], hints: [h1, h2, `x = ${x}. Svaret är ${x}.`] };
+    });
+}
+
 export const mathTemplates: Template[] = [
   factTemplate({ id: "ma.add.inom10.v1", skillId: "ma.add.inom10", representations: ALL,
     facts: addFacts((a, b) => a + b <= 10, 9, 9), hints: addHints }),
@@ -308,6 +560,15 @@ export const mathTemplates: Template[] = [
   twoDigitTemplate("−"),
   missingNumberTemplate(),
   compareTemplate(),
+  stackedTemplate("+"),
+  stackedTemplate("−"),
+  bigMulTemplate(),
+  shortDivTemplate(),
+  remainderTemplate(),
+  roundingTemplate(),
+  precedenceTemplate(),
+  percentTemplate(),
+  equationTemplate(),
   countTemplate(),
   orderTemplate(),
 ];

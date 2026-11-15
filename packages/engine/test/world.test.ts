@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { MATTE_STOPS } from "@eggly/content";
+import { ARCADE_LEVELS, MATTE_STOPS, arcadeSkills } from "@eggly/content";
 import { MATH_SKILLS_WITH_TEMPLATES } from "../src";
 
 describe("kartan och mallarna hänger ihop", () => {
-  it("varje färdighet med mallar har ett stopp på kartan", () => {
-    const onMap = new Set(MATTE_STOPS.flatMap((s) => s.skills));
+  it("varje färdighet med mallar finns på kartan eller i Alla spel", () => {
+    const onMap = new Set([...MATTE_STOPS.flatMap((s) => s.skills), ...ARCADE_LEVELS.flatMap((l) => arcadeSkills(l.level, "mix"))]);
     for (const id of MATH_SKILLS_WITH_TEMPLATES) expect(onMap.has(id), id).toBe(true);
   });
   it("varje stopp har mallar för alla sina färdigheter", () => {

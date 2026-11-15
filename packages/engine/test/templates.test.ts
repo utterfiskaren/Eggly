@@ -31,6 +31,24 @@ function checkByPrompt(q: Question): boolean | null {
     const known = parts.map((x, j) => (x === "?" ? null : +x - j)).filter((x) => x !== null);
     return new Set(known).size === 1 && q.answer === known[0]! + i;
   }
+  m = q.prompt.match(/^(\d+) ÷ (\d+) = \? rest (\d+)$/);
+  if (m) return Math.floor(+m[1] / +m[2]) === q.answer && +m[1] % +m[2] === +m[3];
+  m = q.prompt.match(/^(\d+) ÷ (\d+) = (\d+) rest \?$/);
+  if (m) return +m[1] % +m[2] === q.answer && Math.floor(+m[1] / +m[2]) === +m[3] && q.answer > 0;
+  m = q.prompt.match(/^Avrunda (\d+) till närmaste (tiotal|hundratal|tusental)$/);
+  if (m) {
+    const unit = { tiotal: 10, hundratal: 100, tusental: 1000 }[m[2]]!;
+    return q.answer % unit === 0 && Math.abs(q.answer - +m[1]) <= unit / 2 && (Math.abs(q.answer - +m[1]) < unit / 2 || q.answer > +m[1]);
+  }
+  m = q.prompt.match(/^(\d+) % av (\d+) = \?$/);
+  if (m) return (+m[1] * +m[2]) / 100 === q.answer;
+  m = q.prompt.match(/^(.+), x = \?$/);
+  if (m) {
+    const [l, r] = m[1].replace(/x/g, `(${q.answer})`).replace(/×/g, "*").replace(/−/g, "-").split("=");
+    return new Function(`return (${l}) === (${r});`)() as boolean;
+  }
+  m = q.prompt.match(/^([\d ()+−×]+) = \?$/);
+  if (m && /[()]|[+−].*×|×.*[+−]/.test(m[1])) return new Function(`return ${m[1].replace(/×/g, "*").replace(/−/g, "-")};`)() === q.answer;
   return null; // berättelser: kontrolleras via parametrarna nedan
 }
 

@@ -4,16 +4,36 @@ import type { GameId } from "./steps";
 
 /**
  * Alla spel: spel man väljer själv, med eget matteslag, egen svårighet och eget tempo. Som «Alla spel»
- * i Eggly 1. Svårigheten följer kartans stopp (nivå 1 = första stoppet). Motorns mattemallar når
- * än så länge åk 3–4, så det finns åtta nivåer. Fler kommer med fler mallar.
+ * i Eggly 1. De första åtta nivåerna följer kartans stopp (nivå 1 = första stoppet). Nivå 9–15 finns
+ * bara här: de bygger på mallarna för åk 4–6 och har inga stopp på kartan än.
  */
 
-export const ARCADE_LEVELS = MATTE_STOPS.map((s, i) => ({
+interface ArcadeStop { name: string; blurb: string; skills: string[]; stage: string }
+
+const EXTRA_STOPS: ArcadeStop[] = [
+  { name: "Uppställningen", blurb: "Plus och minus på höjden med stora tal, och avrunda.", stage: "åk 4",
+    skills: ["ma.add.uppstallning", "ma.sub.uppstallning", "ma.tal.avrunda"] },
+  { name: "Gångerslätten", blurb: "Gånger med flersiffriga tal.", stage: "åk 4–5", skills: ["ma.mul.flersiffrigt"] },
+  { name: "Delningsdalen", blurb: "Dela stora tal, och det som blir över.", stage: "åk 4–5", skills: ["ma.div.kort", "ma.div.rest"] },
+  { name: "Räkneordningen", blurb: "Vad räknar man först? Parenteser, gånger, plus och minus.", stage: "åk 5", skills: ["ma.alg.prioritering"] },
+  { name: "Procenttoppen", blurb: "Procent av ett tal, och räkneordning.", stage: "åk 6", skills: ["ma.tal.procent", "ma.alg.prioritering"] },
+  { name: "Ekvationsborgen", blurb: "Lös gåtan med x, och procent.", stage: "åk 6", skills: ["ma.alg.ekvation", "ma.tal.procent"] },
+  { name: "Mästarnivån", blurb: "Allt från åk 4–6 i en enda röra.", stage: "åk 6",
+    skills: ["ma.mul.flersiffrigt", "ma.div.kort", "ma.div.rest", "ma.alg.prioritering", "ma.tal.procent", "ma.alg.ekvation", "ma.add.uppstallning", "ma.sub.uppstallning"] },
+];
+
+const STAGES = ["förskoleklass–åk 1", "åk 1", "åk 1–2", "åk 2", "åk 2–3", "åk 3", "åk 3–4", "åk 4"];
+const STOPS: ArcadeStop[] = [
+  ...MATTE_STOPS.map((s, i) => ({ name: s.name, blurb: s.blurb, skills: s.skills, stage: STAGES[i] ?? "" })),
+  ...EXTRA_STOPS,
+];
+
+export const ARCADE_LEVELS = STOPS.map((s, i) => ({
   level: i + 1,
   name: s.name,
   blurb: s.blurb,
   /** Ungefärlig årskurs, som i Eggly 1. */
-  stage: ["förskoleklass–åk 1", "åk 1", "åk 1–2", "åk 2", "åk 2–3", "åk 3", "åk 3–4", "åk 4"][i] ?? "",
+  stage: s.stage,
 }));
 
 export type ArcadeOp = "mix" | "add" | "sub" | "mul" | "div";
@@ -49,12 +69,12 @@ export const ARCADE_GAME_ORDER: GameId[] = ["rakna", "bubbel", "sant", "minne", 
  * på den nivån än.
  */
 export function arcadeSkills(level: number, op: ArcadeOp): string[] {
-  const idx = Math.max(0, Math.min(MATTE_STOPS.length - 1, Math.round(level) - 1));
+  const idx = Math.max(0, Math.min(STOPS.length - 1, Math.round(level) - 1));
   const prefix = ARCADE_OPS.find((o) => o.id === op)?.prefix ?? "";
   const match = (id: string) => id.startsWith(prefix);
-  const near = [...MATTE_STOPS[idx].skills, ...(idx > 0 ? MATTE_STOPS[idx - 1].skills : [])].filter(match);
+  const near = [...STOPS[idx].skills, ...(idx > 0 ? STOPS[idx - 1].skills : [])].filter(match);
   if (near.length) return near;
-  return MATTE_STOPS.slice(0, idx + 1).flatMap((s) => s.skills).filter(match);
+  return STOPS.slice(0, idx + 1).flatMap((s) => s.skills).filter(match);
 }
 
 /** Matteslagen som finns på en nivå. «Blandat» finns alltid. */
@@ -71,6 +91,6 @@ export function arcadeEggTier(level: number, tempo: number): number {
 }
 
 /** Hjärtan per nivå, som kartans världar: fler fel tillåts på de lägsta nivåerna. */
-const LIVES = [5, 5, 4, 4, 3, 3, 3, 2];
+const LIVES = [5, 5, 4, 4, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2];
 export const arcadeLives = (level: number) => LIVES[Math.max(0, Math.min(LIVES.length - 1, Math.round(level) - 1))];
 
