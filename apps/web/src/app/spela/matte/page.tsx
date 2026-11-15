@@ -3,7 +3,8 @@ import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { EggArt } from "@/components/game/Squishy";
 import { requireChild } from "@/lib/child";
-import { loadWorld } from "@/lib/world";
+import { loadWorld, maxEggRank } from "@/lib/world";
+import { TIER_ORDER } from "@eggly/content";
 
 export const metadata: Metadata = { title: "Matteön" };
 
@@ -32,11 +33,11 @@ export default async function Page() {
       </header>
 
       <div className="kort flex items-center gap-4 p-4">
-        <EggArt size={52} progress={w.eggProgress} crack={w.eggs > 0} />
+        <EggArt tier={TIER_ORDER[maxEggRank(w)]} cracks={w.eggs > 0 ? 2 : 0} size={56} />
         <div className="flex-1">
           <p className="font-semibold"><span aria-hidden="true">⭐</span> {w.totalStars} stjärnor</p>
           <p className="hjalptext">
-            {w.eggs > 0 ? `Du har ${w.eggs === 1 ? "ett ägg" : `${w.eggs} ägg`} som vill kläckas!` : "Samla stjärnor så kläcks ditt nästa ägg."}
+            {w.eggs > 0 ? `Du har ${w.eggs === 1 ? "ett ägg" : `${w.eggs} ägg`} som vill kläckas!` : `Nästa ägg är ${Math.round(w.eggProgress * 100)} % klart.`}
           </p>
         </div>
         <Link href="/spela/samling" className={`squish squish--liten ${w.eggs > 0 ? "" : "squish--mjuk"}`}>

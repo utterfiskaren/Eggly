@@ -2,7 +2,7 @@
 
 import { supabaseServer } from "@/lib/supabase/server";
 import { answerQuestion, startSession, takeHint, type AnswerResult, type ClientQuestion } from "@/lib/play";
-import { hatch } from "@/lib/world";
+import { hatch, type HatchView } from "@/lib/world";
 import type { Mode } from "@eggly/engine";
 
 /** Barnets id hämtas alltid från den verifierade inloggningen. */
@@ -21,13 +21,12 @@ export async function startMatte(mode: Mode, stopId: string): Promise<ClientQues
   return startSession(await childId(), MODES.includes(mode) ? mode : "aventyr", String(stopId).slice(0, 40));
 }
 
-/** Kläcker ett ägg. Ger klämmisens id, eller null om inget ägg fanns. */
-export async function klackAgg(): Promise<string | null> {
+/** Kläcker ett ägg. Ger klämmisen (med färdig bild), eller null om inget ägg fanns. */
+export async function klackAgg(): Promise<HatchView | null> {
   // Ingen omladdning av sidan här: då försvinner kläckningen innan barnet hunnit se klämmisen.
   // Kläckaren laddar om sidan själv när barnet trycker vidare.
   // Kartan och samlingen renderas alltid på nytt, så inget behöver rensas.
-  const s = await hatch(await childId());
-  return s?.id ?? null;
+  return hatch(await childId());
 }
 
 export async function svara(sessionId: string, answer: string): Promise<AnswerResult | null> {

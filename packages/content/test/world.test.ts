@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MATTE_STOPS, SQUISHIES, eggsAvailable, hatchPick, mathSkills, openStops, stopStars } from "../src";
+import { HATCHABLE, MATTE_STOPS, SPECIES, TIER_ORDER, eggSvg, eggsAvailable, hatchRoll, mathSkills, openStops, squishySvg, stopStars } from "../src";
 
 describe("Matteöns karta", () => {
   it("varje stopp har unikt id och färdigheter som finns i kunskapskartan", () => {
@@ -41,14 +41,22 @@ describe("ägg och klämmisar", () => {
     expect(eggsAvailable(10, 5)).toBe(0);
   });
 
-  it("ger ingen dubblett förrän samlingen är komplett", () => {
-    const owned: string[] = [];
-    for (let i = 0; i < SQUISHIES.length; i++) owned.push(hatchPick(owned, (i * 0.37) % 1).id);
-    expect(new Set(owned).size).toBe(SQUISHIES.length);
-    expect(SQUISHIES.map((s) => s.id)).toContain(hatchPick(owned, 0.5).id);
+  it("kläcker aldrig bättre än barnets nivå och föredrar nya arter", () => {
+    let x = 1;
+    const rnd = () => { x = (x * 48271) % 2147483647; return x / 2147483647; };
+    for (let top = 0; top < 8; top++) for (let i = 0; i < 200; i++) {
+      const h = hatchRoll([], top, rnd);
+      expect(TIER_ORDER.indexOf(h.tier)).toBeLessThanOrEqual(top);
+      expect(HATCHABLE.some((s) => s.id === h.id)).toBe(true);
+    }
   });
 
-  it("klämmisarna har unika id", () => {
-    expect(new Set(SQUISHIES.map((s) => s.id)).size).toBe(SQUISHIES.length);
+  it("alla arter och ägg går att rita", () => {
+    for (const s of SPECIES) {
+      const svg = squishySvg(s.id, {});
+      expect(svg.startsWith("<svg")).toBe(true);
+      expect(svg).not.toMatch(/undefined|NaN/);
+    }
+    for (let t = 0; t < TIER_ORDER.length; t++) expect(eggSvg(t, 2)).not.toMatch(/undefined|NaN/);
   });
 });

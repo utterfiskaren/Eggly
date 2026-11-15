@@ -146,3 +146,21 @@ describe("acceptanstester för motorn", () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 });
+
+describe("pass på ett stopp på kartan", () => {
+  it("går vidare till nästa färdighet i stoppet när det går bra", async () => {
+    const { newSession, nextQuestion, recordAnswer, seededRng } = await import("../src");
+    const rng = seededRng(5);
+    let child = { entryGrade: 1, skills: {} } as import("../src").ChildModel;
+    let session = newSession("stopp", "aventyr", { skills: ["ma.tal.antal10", "ma.tal.ordning20", "ma.tal.jamfora"], source: "child_choice" });
+    const seen = new Set<string>();
+    let now = Date.UTC(2026, 10, 16);
+    for (let i = 0; i < 8; i++) {
+      const plan = nextQuestion(child, session, { now, rng, available: ["ma.tal.antal10", "ma.tal.ordning20", "ma.tal.jamfora"] });
+      seen.add(plan.question.skillId);
+      const out = recordAnswer(child, session, plan, true, 0, now);
+      child = out.child; session = out.session; now += 20_000;
+    }
+    expect(seen.size).toBeGreaterThanOrEqual(2);
+  });
+});

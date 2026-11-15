@@ -1,7 +1,8 @@
 import "server-only";
 import { randomInt } from "node:crypto";
 import {
-  MATTE_STOPS, eggProgress, eggsAvailable, hatchPick, openStops, stopStars, type Squishy, type WorldStop,
+  MATTE_STOPS, TIERS, eggProgress, eggsAvailable, hatchRoll, openStops, speciesById, squishySvg, stopStars,
+  type Treats, type WorldStop,
 } from "@eggly/content";
 import { entryGradeFor } from "@eggly/engine";
 import { supabaseAdmin } from "./supabase/admin";
@@ -110,23 +111,40 @@ export async function finishStop(childId: string, stopId: string, r: { correct: 
  * Kläcker ett ägg. Belöningsloggen har en unik nyckel per kläckning, så ett dubbelklick eller två
  * flikar samtidigt kan aldrig ge två klämmisar för samma ägg.
  */
-export async function hatch(childId: string): Promise<Squishy | null> {
+export interface HatchView { id: string; name: string; tierName: string; txt: string; svg: string }
+
+/** Bästa äggnivån barnet kan få: en nivå per öppet stopp på kartan (Brons på första stoppet). */
+export function maxEggRank(world: WorldView): number {
+  return Math.max(0, world.stops.filter((s) => s.open).length - 1);
+}
+
+export async function hatch(childId: string): Promise<HatchView | null> {
   const db = supabaseAdmin();
-  const t = await totals(childId);
+  const world = await loadWorld(childId);
+  const t = { stars: world.totalStars, hatched: world.hatched };
   if (eggsAvailable(t.stars, t.hatched) < 1) return null;
   const { data: owned } = await db.from("owned_squishies").select("squishy_id").eq("child_id", childId);
-  const pick = hatchPick((owned ?? []).map((o) => o.squishy_id as string), randomInt(0, 1_000_000) / 1_000_000);
+  const rnd = () => randomInt(0, 1_000_000_000) / 1_000_000_000;
+  const pick = hatchRoll((owned ?? []).map((o) => o.squishy_id as string), maxEggRank(world), rnd);
   const n = t.hatched + 1;
   const { error } = await db.from("reward_ledger").insert({
     idempotency_key: `${childId}:hatch:${n}`, child_id: childId, kind: "squishy", amount: 1, ref: pick.id, reason: "ägg kläckt",
   });
   if (error) return null; // någon annan begäran hann kläcka just det här ägget
-  await db.from("owned_squishies").insert({ child_id: childId, squishy_id: pick.id });
-  return pick;
+  await db.from("owned_squishies").insert({
+    child_id: childId, squishy_id: pick.id, customization: { treats: pick.treats, seed: pick.seed, tier: pick.tier },
+  });
+  const sp = speciesById(pick.id)!;
+  return { id: pick.id, name: sp.name, tierName: TIERS[pick.tier].name, txt: sp.txt, svg: squishySvg(pick.id, pick.treats) };
 }
 
-export async function collection(childId: string): Promise<{ squishyId: string; obtainedAt: string }[]> {
-  const { data } = await supabaseAdmin().from("owned_squishies").select("squishy_id, obtained_at")
-    .eq("child_id", childId).order("obtained_at", { ascending: true });
-  return (data ?? []).map((r) => ({ squishyId: r.squishy_id as string, obtainedAt: r.obtained_at as string }));
+export interface Owned { squishyId: string; treats: Treats; obtainedAt: string; legacy: boolean }
+
+export async function collection(childId: string): Promise<Owned[]> {
+  const { data } = await supabaseAdmin().from("owned_squishies").select("squishy_id, customization, obtained_at")
+    .eq("child_id", childId).order("obtained_at", { ascending: false });
+  return (data ?? []).map((r) => {
+    const c = (r.customization ?? {}) as { treats?: Treats; legacy?: boolean };
+    return { squishyId: r.squishy_id as string, treats: c.treats ?? {}, obtainedAt: r.obtained_at as string, legacy: !!c.legacy };
+  });
 }

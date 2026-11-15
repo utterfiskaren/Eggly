@@ -192,12 +192,16 @@ function chooseSkill(child: ChildModel, session: SessionState, available: string
 
   // 4. Ny färdighet: när förkunskaperna sitter och barnet inte redan övar på för många.
   const active = started.filter((s) => s.status === "introduced" || s.status === "practicing");
-  if (session.guardLeft === 0 && session.newSkills < ENGINE_RULES.newSkillsPerSession && active.length < ENGINE_RULES.maxActiveSkills) {
+  // På ett stopp på kartan har barnet själv valt området. Går det bra (fyra rätt i rad utan hjälp)
+  // får nästa färdighet i stoppet komma redan i samma pass, så att passet inte blir bara en sorts uppgift.
+  const streak = session.items.length >= 4 && session.items.slice(-4).every((x) => x.correct && x.hintLevel === 0);
+  const newLimit = session.focus?.source === "child_choice" ? ENGINE_RULES.newSkillsPerSession + 1 : ENGINE_RULES.newSkillsPerSession;
+  if (session.guardLeft === 0 && session.newSkills < newLimit && (active.length < ENGINE_RULES.maxActiveSkills || streak)) {
     const fresh = pool
       .map((id) => SKILL_BY_ID.get(id)!)
       .filter((sk) => sk && stateOf(child, sk.id).status === "not_seen" && prereqsOk(child, sk, avail) && sk.gradeMin <= child.entryGrade + 1)
       .sort((a, b) => a.gradeMin - b.gradeMin || a.prereqs.length - b.prereqs.length);
-    const needNew = started.length === 0 || active.length === 0 || (rng() < 0.15 && !recentWrong);
+    const needNew = started.length === 0 || active.length === 0 || (streak && session.focus?.source === "child_choice") || (rng() < 0.15 && !recentWrong);
     if (fresh.length && needNew) {
       return { skillId: fresh[0].id, reason: focusReason ?? "new_skill", target: ENGINE_RULES.safeTarget, dShift: 0 };
     }

@@ -1,0 +1,73 @@
+import * as art from "./art";
+
+/**
+ * Klämmisarna i Eggly 2. Samma figurer som i Eggly 1, så att barnens gamla samlingar följer med.
+ * Inget går att köpa. Ägg tjänas bara in med stjärnor från spelet.
+ */
+
+export type Treats = Partial<Record<"hat" | "glasses" | "bow" | "clothes" | "acc" | "skin", string>>;
+
+export interface Species {
+  id: string;
+  name: string;
+  kind: string;
+  /** Nivå (index i TIERS). */
+  tier: number;
+  txt: string;
+  special?: string;
+}
+
+export const TIERS: { id: string; name: string }[] = art.TIERS;
+/** Nivåernas ordning från lättast till svårast. RANK[nivå] = plats i ordningen. */
+export const TIER_ORDER: number[] = art.TORDER;
+export const TIER_RANK: number[] = art.RANK;
+export const SPECIES: Species[] = art.SQ;
+export const SLOT_NAME: Record<string, string> = art.SLOT_NAME;
+
+/** Arter som kan komma ur vanliga ägg. Specialarterna fick man för särskilda bedrifter i Eggly 1. */
+export const HATCHABLE: Species[] = SPECIES.filter((s) => !s.special);
+
+export function speciesById(id: string): Species | undefined {
+  return art.SQ_BY[id];
+}
+
+export function treatName(id: string): string | undefined {
+  return (art.TREAT_BY[id] ?? art.SKIN_BY[id])?.name;
+}
+
+/** SVG-text för en klämmis. Varje anrop får egna id:n för gradienter, så flera kan ritas på samma sida. */
+export function squishySvg(id: string, treats: Treats = {}): string {
+  return art.sqSVG(id, { treats });
+}
+
+/** SVG-text för ett ägg av en viss nivå, med 0–5 sprickor. */
+export function eggSvg(tier: number, cracks = 0): string {
+  return art.eggSVG(tier, cracks);
+}
+
+/** Hur många tryck ett ägg av nivån behöver för att kläckas. */
+export function tapsFor(tier: number): number {
+  return art.TAPS[tier] ?? 3;
+}
+
+export interface Hatched { id: string; tier: number; treats: Treats; seed: number }
+
+/**
+ * Bestämmer vad ett ägg blir. `maxRank` är den bästa nivån barnet kan få (efter hur långt det kommit
+ * på kartan). Oftast blir det den nivån, ibland en eller två steg lägre. Arter barnet inte har än
+ * kommer tre gånger så ofta som dubbletter.
+ */
+export function hatchRoll(owned: string[], maxRank: number, rnd: () => number = Math.random): Hatched {
+  const top = Math.max(0, Math.min(TIER_ORDER.length - 1, Math.floor(maxRank)));
+  const r = rnd();
+  const rank = Math.max(0, top - (r < 0.5 ? 0 : r < 0.85 ? 1 : 2));
+  let tier = TIER_ORDER[rank];
+  let pool = HATCHABLE.filter((s) => s.tier === tier);
+  if (pool.length === 0) { tier = TIER_ORDER[0]; pool = HATCHABLE.filter((s) => s.tier === tier); }
+  const have = new Set(owned);
+  const w = pool.map((s) => (have.has(s.id) ? 1 : 3));
+  let x = rnd() * w.reduce((a, b) => a + b, 0);
+  let pick = pool[0];
+  for (let i = 0; i < pool.length; i++) { x -= w[i]; if (x <= 0) { pick = pool[i]; break; } }
+  return { id: pick.id, tier, treats: art.rollTreats(tier), seed: Math.floor(rnd() * 2147483647) };
+}
