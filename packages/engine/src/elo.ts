@@ -13,7 +13,7 @@ export function pCorrect(theta: number, beta: number): number {
  * Hur mycket ett svar flyttar skattningen. Stort i början (få svar), mindre när skattningen är säker.
  * Startvärden som ska kalibreras mot riktiga svar.
  */
-export function kFactor(n: number, base = 0.4, min = 0.08): number {
+export function kFactor(n: number, base = 0.6, min = 0.1): number {
   return Math.max(min, base / (1 + n / 10));
 }
 
@@ -36,7 +36,8 @@ export function updateElo(
   hintLevel = 0,
 ): EloUpdate {
   const expected = pCorrect(theta, beta);
-  const score = correct ? Math.max(0.4, 1 - 0.2 * hintLevel) : 0;
+  // Rätt efter ledtråd betyder oftast att barnet först inte kunde: halv poäng, mindre med mer hjälp.
+  const score = !correct ? 0 : hintLevel === 0 ? 1 : hintLevel === 1 ? 0.5 : 0.3;
   return {
     theta: theta + kFactor(thetaN) * (score - expected),
     beta: beta - kFactor(betaN, 0.2, 0.02) * (score - expected),

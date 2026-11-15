@@ -169,4 +169,21 @@ set role authenticated;
 select pg_temp.expect('lärare A ser nu båda eleverna', (select count(*) from eggly.child_skill_state) = 2);
 reset role;
 
+-- 9. Facit i väntande uppgifter når aldrig barnet.
+insert into eggly.play_sessions (id, child_id, subject) values ('00000000-0000-0000-0000-00000000aaa1','00000000-0000-0000-0000-0000000000b1','matte');
+insert into eggly.pending_questions (session_id, child_id, item_index, planned) values
+  ('00000000-0000-0000-0000-00000000aaa1','00000000-0000-0000-0000-0000000000b1',0,'{"question":{"answer":7}}');
+insert into eggly.reward_ledger (idempotency_key, child_id, kind, amount, reason) values
+  ('t1','00000000-0000-0000-0000-0000000000b1','stars',3,'test'), ('t2','00000000-0000-0000-0000-0000000000b2','stars',5,'test');
+select pg_temp.as_user('00000000-0000-0000-0000-0000000000b1');
+set role authenticated;
+do $$ begin
+  perform count(*) from eggly.pending_questions;
+  raise exception 'MISSLYCKADES: barnet kunde läsa facit';
+exception when insufficient_privilege then raise notice 'ok: facit är dolt för barnet';
+end $$;
+select pg_temp.expect('barnet ser sitt eget pass', (select count(*) from eggly.play_sessions) = 1);
+select pg_temp.expect('belöningssumman visar bara egna stjärnor', (select sum(total) from eggly.reward_totals) = 3);
+reset role;
+
 \echo 'ALLA BEHÖRIGHETSTESTER GICK IGENOM'

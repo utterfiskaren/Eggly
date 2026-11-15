@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { signOut } from "@/app/actions/auth";
 import { decideJoin } from "@/app/actions/klass";
@@ -8,9 +9,9 @@ import { supabaseServer } from "@/lib/supabase/server";
 export const metadata: Metadata = { title: "Spela" };
 
 const ISLANDS = [
-  { id: "matte", name: "Matteön", color: "var(--mynta)", note: "Öppnar i nästa steg" },
-  { id: "svenska", name: "Ordön", color: "var(--himmel)", note: "Kommer snart" },
-  { id: "engelska", name: "Språkön", color: "var(--apelsin)", note: "Kommer snart" },
+  { id: "matte", name: "Matteön", color: "var(--mynta)", note: "Spela nu", href: "/spela/matte" },
+  { id: "svenska", name: "Ordön", color: "var(--himmel)", note: "Kommer snart", href: null },
+  { id: "engelska", name: "Språkön", color: "var(--apelsin)", note: "Kommer snart", href: null },
 ];
 
 export default async function Page() {
@@ -35,13 +36,22 @@ export default async function Page() {
       <section aria-labelledby="oar" className="flex flex-col gap-3">
         <h2 id="oar" style={{ fontSize: "var(--t-xl)" }}>Välj en ö</h2>
         <ul className="grid gap-4 sm:grid-cols-3">
-          {ISLANDS.map((i) => (
-            <li key={i.id} className="kort flex flex-col items-center gap-2 p-5 text-center">
-              <span className="h-20 w-20" style={{ background: i.color, borderRadius: "var(--agg)" }} aria-hidden="true" />
-              <span className="display" style={{ fontSize: "var(--t-lg)" }}>{i.name}</span>
-              <span className="hjalptext">{i.note}</span>
-            </li>
-          ))}
+          {ISLANDS.map((i) => {
+            const inner = (
+              <>
+                <span className="h-20 w-20" style={{ background: i.color, borderRadius: "var(--agg)", opacity: i.href ? 1 : 0.45 }} aria-hidden="true" />
+                <span className="display" style={{ fontSize: "var(--t-lg)" }}>{i.name}</span>
+                <span className="hjalptext">{i.note}</span>
+              </>
+            );
+            return (
+              <li key={i.id}>
+                {i.href
+                  ? <Link href={i.href} className="kort kort--klick flex h-full flex-col items-center gap-2 p-5 text-center">{inner}</Link>
+                  : <div className="kort flex h-full flex-col items-center gap-2 p-5 text-center" aria-disabled="true">{inner}</div>}
+              </li>
+            );
+          })}
         </ul>
       </section>
 

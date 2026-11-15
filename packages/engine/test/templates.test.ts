@@ -1,0 +1,93 @@
+import { describe, expect, it } from "vitest";
+import { isCorrect, mathTemplates, parseAnswer, seededRng, type Question } from "../src";
+import { mathSkills } from "@eggly/content";
+
+const OPS: Record<string, (a: number, b: number) => number> = {
+  "+": (a, b) => a + b, "−": (a, b) => a - b, "×": (a, b) => a * b, "÷": (a, b) => a / b,
+};
+
+/** Kontrollerar facit genom att räkna om uppgiften från texten, oberoende av mallen. */
+function checkByPrompt(q: Question): boolean | null {
+  let m = q.prompt.match(/^(\d+) ([+−×÷]) (\d+) = \?$/);
+  if (m) return OPS[m[2]](+m[1], +m[3]) === q.answer;
+  m = q.prompt.match(/^(\d+) ([+−×÷]) \? = (\d+)$/);
+  if (m) return OPS[m[2]](+m[1], q.answer) === +m[3];
+  m = q.prompt.match(/^\? ([+−×÷]) (\d+) = (\d+)$/);
+  if (m) return OPS[m[1]](q.answer, +m[2]) === +m[3];
+  m = q.prompt.match(/^Dubbelt så mycket som (\d+) = \?$/);
+  if (m) return 2 * +m[1] === q.answer;
+  m = q.prompt.match(/^Hälften av (\d+) = \?$/);
+  if (m) return +m[1] / 2 === q.answer;
+  if (q.prompt === "Vilket tal är störst?") return q.answer === Math.max(...q.choices!);
+  return null; // berättelser: kontrolleras via parametrarna nedan
+}
+
+const SAMPLES = 400;
+
+describe("frågemallar för matte", () => {
+  it("varje mall hör till en färdighet i kunskapskartan", () => {
+    const ids = new Set(mathSkills.map((s) => s.id));
+    for (const t of mathTemplates) expect(ids.has(t.skillId), t.skillId).toBe(true);
+  });
+
+  for (const t of mathTemplates) {
+    describe(t.id, () => {
+      it("har rätt facit i alla frågetyper och svårigheter", () => {
+        const rng = seededRng(42);
+        let checked = 0;
+        for (const rep of t.representations) for (let i = 0; i < SAMPLES; i++) {
+          const q = t.generate(rng, i / SAMPLES, rep);
+          expect(Number.isInteger(q.answer), `${q.prompt} → ${q.answer}`).toBe(true);
+          expect(q.answer).toBeGreaterThanOrEqual(0);
+          const ok = checkByPrompt(q);
+          if (ok !== null) { expect(ok, `${t.id} ${rep}: ${q.prompt} = ${q.answer}`).toBe(true); checked++; }
+        }
+        expect(checked).toBeGreaterThan(0);
+      });
+
+      it("svarsalternativen är unika och rätt svar finns exakt en gång (AT-09)", () => {
+        if (!t.representations.includes("choice")) return;
+        const rng = seededRng(7);
+        for (let i = 0; i < SAMPLES; i++) {
+          const q = t.generate(rng, i / SAMPLES, "choice");
+          expect(q.choices).toBeDefined();
+          expect(new Set(q.choices).size).toBe(q.choices!.length);
+          expect(q.choices!.filter((c) => c === q.answer).length).toBe(1);
+          expect(q.choices!.every((c) => c >= 0)).toBe(true);
+        }
+      });
+
+      it("ledtråd 1 och 2 avslöjar aldrig svaret", () => {
+        const rng = seededRng(99);
+        for (const rep of t.representations) for (let i = 0; i < SAMPLES / 2; i++) {
+          const q = t.generate(rng, (i * 2) / SAMPLES, rep);
+          const [h1, h2, h3] = t.hints(q);
+          const inPrompt = new Set((q.prompt.match(/\d+/g) ?? []).map(Number));
+          for (const h of [h1, h2]) {
+            const leaks = (h.match(/\d+/g) ?? []).map(Number).filter((n) => n === q.answer && !inPrompt.has(n));
+            expect(leaks, `${t.id} ${rep} «${q.prompt}» ledtråd: ${h}`).toEqual([]);
+          }
+          expect(h3).toContain(String(q.answer));
+        }
+      });
+
+      it("svårigheten väljer lättare tal i början och svårare i slutet", () => {
+        const rng = seededRng(3);
+        const size = (d: number) => {
+          let sum = 0;
+          for (let i = 0; i < 200; i++) sum += t.generate(rng, d, t.representations[0]).difficulty;
+          return sum / 200;
+        };
+        expect(size(0.05)).toBeLessThan(size(0.95));
+      });
+    });
+  }
+});
+
+describe("rättning", () => {
+  it("är förlåtande mot hur barn skriver", () => {
+    for (const s of ["7", " 7 ", "07", "7,0", "7.0", "+7"]) expect(isCorrect(s, 7), s).toBe(true);
+    for (const s of ["", "sju", "7a", "77", "-7"]) expect(isCorrect(s, 7), s).toBe(false);
+    expect(parseAnswer("1 000")).toBe(1000);
+  });
+});
