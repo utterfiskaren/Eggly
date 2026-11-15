@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Clock } from "./Clock";
 import type { RoundAnswer } from "@/lib/rounds";
+import { sfx } from "@/lib/sfx";
 import { fmt, readNum } from "@/lib/num";
 import type { BoardProps } from "./types";
 
@@ -29,6 +30,7 @@ export function Spurt({ questions, clock, goal, onDone }: BoardProps) {
     if (state !== "ask" || over || value === "") return;
     const ok = Math.abs(readNum(value) - q.answer) < 1e-9;
     answers.current = [...answers.current, { correct: ok, i: idx }];
+    (ok ? sfx.right : sfx.wrong)();
     setState(ok ? "right" : "wrong");
     if (ok) setRight((r) => r + 1);
   }

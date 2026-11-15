@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Clock } from "./Clock";
+import { sfx } from "@/lib/sfx";
 import type { GameProps } from "./types";
 
 const COINS = [1, 2, 5, 10, 20, 50, 100, 200];
@@ -43,6 +44,7 @@ export function Kiosk({ q, seconds, onAnswer }: GameProps) {
 
   useEffect(() => {
     if (state === "play") return;
+    (state === "right" ? sfx.right : sfx.wrong)();
     const t = window.setTimeout(() => onAnswer(state === "right"), state === "right" ? 900 : 1800);
     return () => window.clearTimeout(t);
   }, [state, onAnswer]);

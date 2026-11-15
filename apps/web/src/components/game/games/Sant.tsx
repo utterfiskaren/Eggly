@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { QuestionVisual } from "../Visuals";
 import { Clock } from "./Clock";
 import { fmt } from "@/lib/num";
+import { sfx } from "@/lib/sfx";
 import type { GameProps } from "./types";
 
 /**
@@ -25,6 +26,7 @@ export function Sant({ q, seconds, onAnswer, index }: GameProps) {
   const timeout = useCallback(() => setSaid(!truth), [truth]); // tiden ute räknas som fel
   useEffect(() => {
     if (!done) return;
+    (ok ? sfx.right : sfx.wrong)();
     const t = window.setTimeout(() => onAnswer(ok), ok ? 700 : 1700);
     return () => window.clearTimeout(t);
   }, [done, ok, onAnswer]);

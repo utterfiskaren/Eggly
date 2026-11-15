@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Clock } from "./Clock";
+import { sfx } from "@/lib/sfx";
 import type { GameProps } from "./types";
 
 const DEFAULT = { mul: false, k: 2, hi: 9 };
@@ -33,6 +34,7 @@ export function Krossa({ seconds, onAnswer, kross }: GameProps) {
   }
   useEffect(() => {
     if (state === "play") return;
+    (state === "right" ? sfx.right : sfx.wrong)();
     const t = window.setTimeout(() => onAnswer(state === "right"), state === "right" ? 700 : 1600);
     return () => window.clearTimeout(t);
   }, [state, onAnswer]);

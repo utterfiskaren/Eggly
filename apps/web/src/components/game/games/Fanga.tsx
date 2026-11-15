@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fmt } from "@/lib/num";
+import { sfx } from "@/lib/sfx";
 import type { GameProps } from "./types";
 
 const H = 300;      // fältets höjd i px
@@ -88,6 +89,7 @@ export function Fanga({ q, seconds, onAnswer, buddySvg }: GameProps) {
 
   useEffect(() => {
     if (phase === "play") return;
+    (phase === "right" ? sfx.right : sfx.wrong)();
     const t = window.setTimeout(() => onAnswer(phase === "right"), phase === "right" ? 600 : 1500);
     return () => window.clearTimeout(t);
   }, [phase, onAnswer]);

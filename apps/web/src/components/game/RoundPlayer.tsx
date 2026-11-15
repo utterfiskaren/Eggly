@@ -11,6 +11,8 @@ import { Fanga } from "./games/Fanga";
 import { Storre } from "./games/Storre";
 import { Krossa } from "./games/Krossa";
 import { Kiosk } from "./games/Kiosk";
+import { Confetti } from "./Confetti";
+import { setSound, sfx, soundOn } from "@/lib/sfx";
 import { Minne } from "./games/Minne";
 import { Spurt } from "./games/Spurt";
 import { Strid } from "./games/Strid";
@@ -35,6 +37,7 @@ export function RoundPlayer({ stepId, eggSvg, arcade, onActive }: { stepId?: str
   const [result, setResult] = useState<RoundResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const [ljud, setLjud] = useState(soundOn);
   const [boardDone, setBoardDone] = useState(false);
   const [completed, setCompleted] = useState(true);
   const sent = useRef(false);
@@ -71,7 +74,7 @@ export function RoundPlayer({ stepId, eggSvg, arcade, onActive }: { stepId?: str
     if (!round || !done || sent.current) return;
     sent.current = true;
     start(async () => {
-      try { setResult(await avslutaSteg(round.roundId, answers, completed)); }
+      try { const r = await avslutaSteg(round.roundId, answers, completed); (r?.passed ? sfx.win : sfx.lose)(); setResult(r); }
       catch { setError("Svaren kom inte fram. Kontrollera nätet och försök igen."); sent.current = false; }
     });
   }, [round, done, answers, completed]);
@@ -88,6 +91,7 @@ export function RoundPlayer({ stepId, eggSvg, arcade, onActive }: { stepId?: str
   if (done) {
     return (
       <section className="kort flex flex-col items-center gap-4 p-6 text-center" aria-live="polite">
+        {result?.passed && <Confetti />}
         {!result ? <p>{pending ? "Räknar ihop …" : error}</p> : result.passed ? (
           <>
             <h2 style={{ fontSize: "var(--t-2xl)" }}>Klarat!</h2>
@@ -127,7 +131,7 @@ export function RoundPlayer({ stepId, eggSvg, arcade, onActive }: { stepId?: str
   if (board) {
     return (
       <section className="flex flex-col gap-3" aria-label={`Spel: ${round.step.title}`}>
-        <div className="flex justify-end"><Link href={backHref} className="lank text-sm">Avsluta</Link></div>
+        <div className="flex items-center justify-between"><button type="button" className="lank text-sm" aria-pressed={ljud} onClick={() => { setSound(!ljud); setLjud(!ljud); }}>Ljud: {ljud ? "på" : "av"}</button><Link href={backHref} className="lank text-sm">Avsluta</Link></div>
         {board({ questions: round.questions, clock: round.clock ?? 0, seconds: round.step.seconds, goal: round.goal ?? 0, hero: round.hero, boss: round.boss, fight: round.fight, onDone: onBoardDone })}
       </section>
     );
@@ -142,6 +146,7 @@ export function RoundPlayer({ stepId, eggSvg, arcade, onActive }: { stepId?: str
           <span aria-hidden="true">{"♥".repeat(Math.max(0, lives))}</span>
           <span aria-hidden="true" className="opacity-25">{"♥".repeat(Math.max(0, round.step.lives - lives))}</span>
         </span>}
+        <button type="button" className="lank text-sm" aria-pressed={ljud} onClick={() => { setSound(!ljud); setLjud(!ljud); }}>Ljud: {ljud ? "på" : "av"}</button>
         <Link href={arcade ? "/spela/spel" : "/spela/matte"} className="lank text-sm">Avsluta</Link>
       </div>
       <Game key={i} q={q} seconds={round.step.seconds} onAnswer={onAnswer} index={i} buddySvg={round.buddySvg} kross={round.kross} />

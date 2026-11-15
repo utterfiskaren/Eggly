@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Clock } from "./Clock";
 import type { RoundAnswer } from "@/lib/rounds";
+import { sfx } from "@/lib/sfx";
 import { fmt } from "@/lib/num";
 import type { BoardProps } from "./types";
 
@@ -30,11 +31,13 @@ export function Strid({ questions, seconds, hero, boss, fight = FALLBACK, onDone
     setPicked(value);
     answers.current = [...answers.current, { correct: ok, i: idx }];
     if (ok) {
+      sfx.hit();
       const crit = Math.random() * 100 < fight.crit;
       const dmg = Math.round(fight.baseD * (0.85 + Math.random() * 0.3) * (crit ? 2 : 1));
       setBhp((b) => Math.max(0, b - dmg));
       setNote(crit ? `Superslag! −${dmg}` : `Du slår bossen: −${dmg}`);
     } else {
+      sfx.wrong();
       setHp((h) => Math.max(0, h - fight.hit));
       setNote(Number.isNaN(value) ? `Tiden tog slut. Bossen slår dig: −${fight.hit}` : `Fel. Bossen slår dig: −${fight.hit}. Svaret är ${fmt(q.answer)}.`);
     }

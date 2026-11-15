@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { QuestionVisual } from "../Visuals";
 import { Clock } from "./Clock";
 import { fmt } from "@/lib/num";
+import { sfx } from "@/lib/sfx";
 import type { GameProps } from "./types";
 
 const COLORS = ["#ffd6e7", "#cfe6ff", "#c9f0e1", "#fff3b8"];
@@ -13,9 +14,10 @@ export function Bubbel({ q, seconds, onAnswer }: GameProps) {
   const [picked, setPicked] = useState<number | null>(null);
   const done = picked !== null;
   const ok = picked === q.answer;
-  const timeout = useCallback(() => setPicked(-1), []);
+  const timeout = useCallback(() => setPicked(Number.NaN), []);
   useEffect(() => {
     if (!done) return;
+    (ok ? sfx.right : sfx.wrong)();
     const t = window.setTimeout(() => onAnswer(ok), ok ? 700 : 1600);
     return () => window.clearTimeout(t);
   }, [done, ok, onAnswer]);

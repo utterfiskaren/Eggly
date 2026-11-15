@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Clock } from "./Clock";
+import { sfx } from "@/lib/sfx";
 import { fmt } from "@/lib/num";
 import type { BoardProps } from "./types";
 
@@ -46,9 +47,11 @@ export function Minne({ questions, clock, onDone }: BoardProps) {
     if (next.length < 2) return;
     const [a, b] = next;
     if (cards[a].pair === cards[b].pair) {
+      sfx.right();
       setFound((f) => [...f, cards[a].pair]);
       setUp([]);
     } else {
+      sfx.wrong();
       setDirty((d) => [...d, cards[a].pair, cards[b].pair]);
       setBusy(true);
       window.setTimeout(() => { setUp([]); setBusy(false); }, 900);

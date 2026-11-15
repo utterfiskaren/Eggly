@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { QuestionVisual } from "../Visuals";
 import { Clock } from "./Clock";
 import { fmt, readNum } from "@/lib/num";
+import { sfx } from "@/lib/sfx";
 import type { GameProps } from "./types";
 
 /**
@@ -17,7 +18,7 @@ export function Rakna({ q, seconds, onAnswer }: GameProps) {
   const nextRef = useRef<HTMLButtonElement>(null);
   const hint = tries > 0 ? q.hints[Math.min(tries, 2) - 1] : undefined;
 
-  const finish = useCallback((ok: boolean) => setState(ok ? "right" : "wrong"), []);
+  const finish = useCallback((ok: boolean) => { (ok ? sfx.right : sfx.wrong)(); setState(ok ? "right" : "wrong"); }, []);
   const timeout = useCallback(() => finish(false), [finish]);
 
   function submit() {

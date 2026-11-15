@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Clock } from "./Clock";
 import { fmt } from "@/lib/num";
+import { sfx } from "@/lib/sfx";
 import type { GameProps } from "./types";
 
 const expr = (p: string) => p.replace(/\s*=\s*\?$/, "");
@@ -25,6 +26,7 @@ export function Storre({ q, seconds, onAnswer, index }: GameProps) {
   const ok = said === truth;
   useEffect(() => {
     if (!done) return;
+    (ok ? sfx.right : sfx.wrong)();
     const t = window.setTimeout(() => onAnswer(ok), ok ? 900 : 2000);
     return () => window.clearTimeout(t);
   }, [done, ok, onAnswer]);
