@@ -1,5 +1,5 @@
 import { TIER_ORDER } from "../klammisar";
-import { MATTE_STOPS } from "./world";
+import { MATTE_STOPS, ORIGINAL_STOP_IDS } from "./world";
 import type { GameId } from "./steps";
 
 /**
@@ -43,7 +43,7 @@ const EXTRA_STOPS: ArcadeStop[] = [
 
 const STAGES = ["förskoleklass–åk 1", "åk 1", "åk 1–2", "åk 2", "åk 2–3", "åk 3", "åk 3–4", "åk 4"];
 const STOPS: ArcadeStop[] = [
-  ...MATTE_STOPS.map((s, i) => ({ name: s.name, blurb: s.blurb, skills: s.skills, stage: STAGES[i] ?? "" })),
+  ...MATTE_STOPS.filter((s) => ORIGINAL_STOP_IDS.includes(s.id)).map((s, i) => ({ name: s.name, blurb: s.blurb, skills: s.skills, stage: STAGES[i] ?? "" })),
   ...EXTRA_STOPS,
 ];
 

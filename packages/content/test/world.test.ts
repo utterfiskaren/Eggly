@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HATCHABLE, MATTE_STOPS, SPECIES, TIER_ORDER, eggSvg, eggsAvailable, hatchRoll, mathSkills, openStops, squishySvg, stopStars } from "../src";
+import { ARCADE_LEVELS, HATCHABLE, MATTE_STOPS, ORIGINAL_STOP_IDS, STEPS, SPECIES, TIER_ORDER, eggSvg, eggsAvailable, hatchRoll, mathSkills, openStops, squishySvg, stopStars } from "../src";
 
 describe("Matteöns karta", () => {
   it("varje stopp har unikt id och färdigheter som finns i kunskapskartan", () => {
@@ -13,6 +13,17 @@ describe("Matteöns karta", () => {
     expect(new Set(all).size).toBe(all.length);
   });
 
+  it("varje stopp tränas av minst ett steg, och alla färdigheter på kartan förekommer i något steg", () => {
+    const inSteps = new Set(STEPS.flatMap((st) => st.skills));
+    for (const st of MATTE_STOPS) for (const k of st.skills) expect(inSteps.has(k), `${st.id}: ${k}`).toBe(true);
+  });
+
+  it("Alla spels första åtta nivåer är de ursprungliga stoppen, i samma ordning", () => {
+    const originals = MATTE_STOPS.filter((st) => ORIGINAL_STOP_IDS.includes(st.id));
+    expect(originals.map((st) => st.id)).toEqual(ORIGINAL_STOP_IDS);
+    expect(ARCADE_LEVELS.slice(0, 8).map((l) => l.name)).toEqual(originals.map((st) => st.name));
+  });
+
   it("ett avslutat pass ger alltid minst en stjärna", () => {
     expect(stopStars(0, 0, 8)).toBe(1);
     expect(stopStars(6, 3, 8)).toBe(2);
@@ -22,14 +33,14 @@ describe("Matteöns karta", () => {
 
   it("öppnar stopp i ordning efter årskurs, stjärnor och kunskap", () => {
     expect(openStops({ grade: 1, stars: {}, skillStatus: {} })).toBe(1);
-    expect(openStops({ grade: 3, stars: {}, skillStatus: {} })).toBe(5);
+    expect(openStops({ grade: 3, stars: {}, skillStatus: {} })).toBe(6);
     expect(openStops({ grade: 1, stars: { prickstranden: 2 }, skillStatus: {} })).toBe(2);
     expect(openStops({ grade: 1, stars: { prickstranden: 1 }, skillStatus: {} })).toBe(1);
     // Stjärnor på ett stopp som inte är öppet öppnar ingenting.
     expect(openStops({ grade: 1, stars: { plusviken: 3 }, skillStatus: {} })).toBe(1);
     const knows = { "ma.tal.antal10": "secure", "ma.tal.ordning20": "mastered", "ma.tal.jamfora": "secure" };
     expect(openStops({ grade: 1, stars: {}, skillStatus: knows })).toBe(2);
-    expect(openStops({ grade: 1, stars: {}, skillStatus: {}, teacherOpened: ["tiobron"] })).toBe(5);
+    expect(openStops({ grade: 1, stars: {}, skillStatus: {}, teacherOpened: ["tiobron"] })).toBe(6);
   });
 });
 

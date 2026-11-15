@@ -1,5 +1,5 @@
 /**
- * Matteöns karta: en stig med åtta stopp. Varje stopp tränar några närliggande färdigheter.
+ * Matteöns karta: en stig med fjorton stopp. Varje stopp tränar några närliggande färdigheter.
  * Stoppen följer kunskapskartan, men barnet behöver inte gå i ordning för att lära sig:
  * motorn repeterar alltid det som behövs. Kartan ger riktning och en känsla av att komma framåt.
  *
@@ -20,28 +20,43 @@ export interface WorldStop {
 
 export const MATTE_STOPS: WorldStop[] = [
   { id: "prickstranden", name: "Prickstranden", blurb: "Räkna prickar och hitta talens ordning.",
-    skills: ["ma.tal.antal10", "ma.tal.ordning20", "ma.tal.jamfora"], x: 14, y: 84 },
+    skills: ["ma.tal.antal10", "ma.tal.ordning20", "ma.tal.jamfora"], x: 8, y: 88 },
   { id: "plusviken", name: "Plusviken", blurb: "Plus och minus upp till 10.",
-    skills: ["ma.add.inom10", "ma.sub.inom10"], x: 40, y: 78 },
+    skills: ["ma.add.inom10", "ma.sub.inom10"], x: 24, y: 84 },
+  { id: "formstranden", name: "Formstranden", blurb: "Former, hela och halva timmar, mönster och tiotal.",
+    skills: ["ma.geo.former", "ma.mat.klockan_hel", "ma.alg.monster", "ma.tal.positionssystem100"], x: 42, y: 86 },
   { id: "tiokompisklippan", name: "Tiokompisklippan", blurb: "Tiokompisar och tal som saknas.",
-    skills: ["ma.tal.tiokamrater", "ma.alg.saknat_tal"], x: 68, y: 70 },
+    skills: ["ma.tal.tiokamrater", "ma.alg.saknat_tal"], x: 60, y: 80 },
   { id: "tjugoskogen", name: "Tjugoskogen", blurb: "Plus och minus upp till 20, dubbelt och hälften.",
-    skills: ["ma.add.inom20_utan", "ma.sub.inom20_utan", "ma.samb.dubbelt_halften"], x: 84, y: 50 },
+    skills: ["ma.add.inom20_utan", "ma.sub.inom20_utan", "ma.samb.dubbelt_halften"], x: 78, y: 74 },
   { id: "tiobron", name: "Tiobron", blurb: "Plus och minus över tian.",
-    skills: ["ma.add.inom20_med", "ma.sub.inom20_med"], x: 58, y: 44 },
+    skills: ["ma.add.inom20_med", "ma.sub.inom20_med"], x: 88, y: 60 },
+  { id: "klockbacken", name: "Klockbacken", blurb: "Klockan på minuten, längd och lika mycket på båda sidor.",
+    skills: ["ma.mat.klockan_minut", "ma.geo.langd", "ma.alg.likhetstecken", "ma.tal.positionssystem1000"], x: 72, y: 52 },
   { id: "gruppgrottan", name: "Gruppgrottan", blurb: "Lika många i varje grupp, och dela lika.",
-    skills: ["ma.mul.grupper", "ma.div.likadelning", "ma.mul.tabell_2_5_10"], x: 30, y: 40 },
+    skills: ["ma.mul.grupper", "ma.div.likadelning", "ma.mul.tabell_2_5_10"], x: 52, y: 48 },
+  { id: "spegelgrottan", name: "Spegelgrottan", blurb: "3D-former, spegelbilder, tabeller och korta berättelser.",
+    skills: ["ma.geo.kroppar", "ma.geo.symmetri", "ma.stat.tabeller", "ma.prob.textuppgift_ett"], x: 32, y: 44 },
   { id: "storstadsberget", name: "Storstadsberget", blurb: "Plus och minus med stora tal.",
-    skills: ["ma.add.tvasiffrigt", "ma.sub.tvasiffrigt"], x: 22, y: 16 },
+    skills: ["ma.add.tvasiffrigt", "ma.sub.tvasiffrigt"], x: 14, y: 36 },
+  { id: "huvudrakningsbyn", name: "Huvudräkningsbyn", blurb: "Smarta knep, överslag, jättestora tal och tänk-på-ett-tal.",
+    skills: ["ma.rakna.huvudrakning", "ma.rakna.overslag", "ma.tal.positionssystem_stora", "ma.prob.logik"], x: 20, y: 22 },
   { id: "tabelltornet", name: "Tabelltornet", blurb: "Gångertabellerna och division.",
-    skills: ["ma.mul.tabell_3_4", "ma.mul.tabell_6_9", "ma.div.tabell"], x: 62, y: 12 },
+    skills: ["ma.mul.tabell_3_4", "ma.mul.tabell_6_9", "ma.div.tabell"], x: 40, y: 14 },
+  { id: "vinkelberget", name: "Vinkelberget", blurb: "Vinklar, chans och vilket bråk som är störst.",
+    skills: ["ma.geo.vinklar", "ma.stat.chans", "ma.tal.brak_jamfora"], x: 62, y: 10 },
+  { id: "bokstavsborgen", name: "Bokstavsborgen", blurb: "Bokstäver som tal, skala och koordinater.",
+    skills: ["ma.alg.uttryck", "ma.geo.skala", "ma.samb.koordinater"], x: 84, y: 14 },
 ];
+
+/** Kartans ursprungliga åtta stopp. Alla spel bygger sina första nivåer på dem och ska inte flytta sig när kartan växer. */
+export const ORIGINAL_STOP_IDS = ["prickstranden", "plusviken", "tiokompisklippan", "tjugoskogen", "tiobron", "gruppgrottan", "storstadsberget", "tabelltornet"];
 
 export const WORLD_RULES = {
   /** Stjärnor på föregående stopp som öppnar nästa. */
   starsToOpenNext: 2,
   /** Hur många stopp som är öppna från start, efter årskurs (index = årskurs, 0 = förskoleklass). */
-  openFromStartByGrade: [1, 1, 3, 5, 7, 8, 8, 8, 8, 8],
+  openFromStartByGrade: [1, 1, 4, 6, 10, 14, 14, 14, 14, 14],
   /** Stjärnor per ägg. Ett pass ger 8–16 stjärnor, så ungefär ett ägg varannan omgång. */
   starsPerEgg: 25,
 } as const;
