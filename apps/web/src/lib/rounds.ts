@@ -1,5 +1,8 @@
 import "server-only";
-import { STEPS, TEMPO, TIER_RANK, mathSkills, roundStars, speciesById, squishySvg, type GameId, type Step } from "@eggly/content";
+import {
+  GAME_NAMES, STEPS, TEMPO, TIER_RANK, arcadeEggTier, arcadeLives, arcadeSkills, eggSvg, mathSkills, roundStars, speciesById, squishySvg,
+  type ArcadeOp, type GameId, type Step,
+} from "@eggly/content";
 import {
   MATH_SKILLS_WITH_TEMPLATES, distractors, emptySkill, entryGradeFor, hashSeed, kioskLevel, kioskTask, krossMode, mathTemplates,
   newSession, pickPartner, planRound, recordAnswer, seededRng,
@@ -60,6 +63,8 @@ export interface Round {
   buddySvg?: string | null;
   /** Talkross: hur rutorna fungerar på det här steget. */
   kross?: KrossMode;
+  /** Sant om omgången är ett spel från Alla spel och inte ett steg på kartan. */
+  arcade?: boolean;
 }
 
 async function loadChild(childId: string): Promise<ChildModel> {
@@ -104,14 +109,42 @@ async function loadBuddy(childId: string): Promise<string | null> {
   return best ? squishySvg(best.squishyId, best.treats) : null;
 }
 
+/** Det en omgång behöver veta: kommer från ett steg på kartan eller från Alla spel. */
+interface RoundSpec {
+  id: string; title: string; game: GameId; tempo: number; n: number; skills: string[];
+  world: number; lives: number; tier: number; index: number;
+  arcade?: boolean;
+}
+
 export async function startRound(childId: string, stepId: string): Promise<Round | null> {
   const step = await openStep(childId, stepId);
   if (!step) return null;
+  return buildRound(childId, {
+    id: step.id, title: step.title, game: step.game, tempo: step.tempo, n: step.n, skills: step.skills,
+    world: step.world, lives: livesFor(step), tier: step.tier, index: step.index,
+  });
+}
+
+export interface ArcadeChoice { game: GameId; op: ArcadeOp; level: number; tempo: number }
+
+/** Alla spel: ett spel barnet valt själv. Null om valet inte stämmer (okänt spel, matteslag som inte finns på nivån). */
+export async function startArcadeRound(childId: string, c: ArcadeChoice): Promise<Round | null> {
+  const level = Math.round(c.level), tempo = Math.round(c.tempo);
+  if (!BUILT.includes(c.game) || !(level >= 1 && level <= 8) || !(tempo >= 0 && tempo <= 4)) return null;
+  const skills = arcadeSkills(level, c.op);
+  if (skills.length === 0) return null;
+  return buildRound(childId, {
+    id: `fritt:${c.game}`, title: GAME_NAMES[c.game], game: c.game, tempo, n: 0, skills,
+    world: level - 1, lives: arcadeLives(level), tier: arcadeEggTier(level, tempo), index: -1, arcade: true,
+  });
+}
+
+async function buildRound(childId: string, step: RoundSpec): Promise<Round | null> {
   let played = playedAs(step.game);
   const cfg = GAME_CFG[played];
   const db = supabaseAdmin();
   const { data: sess, error } = await db.from("play_sessions")
-    .insert({ child_id: childId, subject: "matte", mode: "aventyr", activity: `steg:${step.id}` })
+    .insert({ child_id: childId, subject: "matte", mode: "aventyr", activity: step.arcade ? step.id : `steg:${step.id}` })
     .select("id").single();
   if (error || !sess) throw new Error("Omgången gick inte att starta");
   const child = await loadChild(childId);
@@ -166,16 +199,17 @@ export async function startRound(childId: string, stepId: string): Promise<Round
   }
 
   await db.from("pending_questions").insert({
-    session_id: sess.id, child_id: childId, item_index: 0, planned: { round: plan, step: step.id, free },
+    session_id: sess.id, child_id: childId, item_index: 0,
+    planned: { round: plan, step: step.id, free, ...(step.arcade ? { arcade: { tier: step.tier, lives: step.lives, skills: step.skills } } : {}) },
   });
   return {
     roundId: sess.id,
     step: {
       id: step.id, title: step.title, game: step.game, played, tempo: step.tempo,
       seconds: Math.round(TEMPO[step.tempo].sec * (SECONDS_X[played] ?? 1) * 10) / 10,
-      lives: livesFor(step), tier: step.tier, index: step.index, world: step.world,
+      lives: step.lives, tier: step.tier, index: step.index, world: step.world,
     },
-    questions, buddySvg, kross,
+    questions, buddySvg, kross, arcade: step.arcade ? true : undefined,
   };
 }
 
@@ -188,6 +222,9 @@ export interface RoundResult {
   best: number;
   egg?: number;
   nextStepId?: string;
+  /** Alla spel: äggets bild (färdig SVG) och att det inte var ett steg på kartan. */
+  eggSvg?: string;
+  arcade?: boolean;
 }
 
 /**
@@ -198,17 +235,20 @@ export async function finishRound(childId: string, roundId: string, answers: Rou
   const db = supabaseAdmin();
   const { data: removed } = await db.from("pending_questions").delete()
     .eq("session_id", roundId).eq("child_id", childId).select("planned");
-  const pending = removed?.[0]?.planned as { round: Planned[]; step: string; free?: number } | undefined;
+  const pending = removed?.[0]?.planned as
+    { round: Planned[]; step: string; free?: number; arcade?: { tier: number; lives: number; skills: string[] } } | undefined;
   if (!pending) return null;
-  const step = STEPS.find((s) => s.id === pending.step);
-  if (!step) return null;
+  const step = pending.arcade ? undefined : STEPS.find((s) => s.id === pending.step);
+  if (!pending.arcade && !step) return null;
+  const skillsFocus = pending.arcade?.skills ?? step!.skills;
+  const lives = pending.arcade?.lives ?? livesFor(step!);
 
   const plan = pending.round;
   // Spel utan mattemallar (Kiosken, Talkross) räknas för stjärnor och steg men inte för barnets modell.
   const given = answers.slice(0, pending.free ? pending.free : plan.length);
   const now = Date.now();
   let child = await loadChild(childId);
-  let session: SessionState = newSession(roundId, "aventyr", { skills: step.skills, source: "child_choice" });
+  let session: SessionState = newSession(roundId, "aventyr", { skills: skillsFocus, source: "child_choice" });
   const touched = new Set<string>();
   const attempts: Record<string, unknown>[] = [];
   given.forEach((a, i) => {
@@ -227,7 +267,7 @@ export async function finishRound(childId: string, roundId: string, answers: Rou
 
   const right = given.filter((a) => a.correct).length;
   const wrong = given.length - right;
-  const passed = completed && given.length > 0 && wrong < livesFor(step);
+  const passed = completed && given.length > 0 && wrong < lives;
 
   const writes: PromiseLike<unknown>[] = [];
   for (const id of touched) {
@@ -248,7 +288,14 @@ export async function finishRound(childId: string, roundId: string, answers: Rou
 
   const stars = roundStars(right, wrong);
   if (!passed) return { passed, right, wrong, stars: 0, best: 0 };
-  const { best } = await clearStep(childId, step, stars, roundId);
-  const next = STEPS[step.index + 1];
-  return { passed, right, wrong, stars, best, egg: step.tier, nextStepId: next?.id };
+  if (pending.arcade) {
+    // Fritt spel ger ett ägg efter nivå och tempo. Nyckeln gör att samma omgång aldrig kan ge två ägg.
+    await db.from("reward_ledger").insert({
+      idempotency_key: `${roundId}:egg`, child_id: childId, kind: "egg", amount: 1, ref: String(pending.arcade.tier), reason: "fritt spel klarat",
+    });
+    return { passed, right, wrong, stars, best: 0, egg: pending.arcade.tier, eggSvg: eggSvg(pending.arcade.tier), arcade: true };
+  }
+  const { best } = await clearStep(childId, step!, stars, roundId);
+  const next = STEPS[step!.index + 1];
+  return { passed, right, wrong, stars, best, egg: step!.tier, nextStepId: next?.id };
 }

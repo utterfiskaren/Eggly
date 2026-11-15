@@ -8,3 +8,6 @@ export {
   type Species, type Treats, type Hatched,
 } from "./klammisar";
 export { STEPS, STEP_BY_ID, TEMPO, GAME_NAMES, WORLD_BOSSES, roundStars, openUpTo, type Step, type GameId } from "./matte/steps";
+export {
+  ARCADE_LEVELS, ARCADE_OPS, ARCADE_GAME_INFO, ARCADE_GAME_ORDER, arcadeSkills, arcadeOps, arcadeEggTier, arcadeLives, type ArcadeOp,
+} from "./matte/arcade";

@@ -35,7 +35,10 @@ export default async function Page() {
       </header>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 style={{ fontSize: "var(--t-2xl)" }}>Hej {profile?.alias ?? "där"}!</h1>
-        <Link href="/spela/samling" className="squish squish--liten squish--mjuk">Min samling</Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/spela/spel" className="squish squish--liten">Alla spel</Link>
+          <Link href="/spela/samling" className="squish squish--liten squish--mjuk">Min samling</Link>
+        </div>
       </div>
 
       <section aria-labelledby="oar" className="flex flex-col gap-3">

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { avslutaSteg, startaSteg } from "@/app/actions/spel";
+import { avslutaSteg, startaFrittSpel, startaSteg } from "@/app/actions/spel";
 import type { Round, RoundAnswer, RoundResult } from "@/lib/rounds";
 import { Rakna } from "./games/Rakna";
 import { Bubbel } from "./games/Bubbel";
@@ -21,7 +21,9 @@ const GAMES: Record<string, (p: GameProps) => React.ReactNode> = {
  * Spelar en omgång på ett steg: hämtar uppgifterna, visar rätt minispel, håller koll på hjärtan
  * och klocka, och skickar svaren när omgången är slut. Servern avgör om steget är klarat.
  */
-export function RoundPlayer({ stepId, eggSvg }: { stepId: string; eggSvg: string }) {
+export interface ArcadeSpec { game: string; op: string; level: number; tempo: number }
+
+export function RoundPlayer({ stepId, eggSvg, arcade, onActive }: { stepId?: string; eggSvg?: string; arcade?: ArcadeSpec; onActive?: (active: boolean) => void }) {
   const [round, setRound] = useState<Round | null>(null);
   const [i, setI] = useState(0);
   const [answers, setAnswers] = useState<RoundAnswer[]>([]);
@@ -33,12 +35,15 @@ export function RoundPlayer({ stepId, eggSvg }: { stepId: string; eggSvg: string
   const lives = round ? round.step.lives - answers.filter((a) => !a.correct).length : 0;
   const done = !!round && (i >= round.questions.length || lives <= 0);
 
+  const playing = !!round && !done;
+  useEffect(() => { onActive?.(playing); }, [playing, onActive]);
+
   function begin() {
     setError(null); setResult(null); setAnswers([]); setI(0); sent.current = false;
     start(async () => {
       try {
-        const r = await startaSteg(stepId);
-        if (!r) setError("Det här steget är inte öppet än.");
+        const r = arcade ? await startaFrittSpel(arcade.game, arcade.op, arcade.level, arcade.tempo) : await startaSteg(stepId ?? "");
+        if (!r) setError(arcade ? "Det här valet går inte att spela just nu." : "Det här steget är inte öppet än.");
         else setRound(r);
       } catch { setError("Något gick fel med anslutningen. Försök igen."); }
     });
@@ -79,13 +84,15 @@ export function RoundPlayer({ stepId, eggSvg }: { stepId: string; eggSvg: string
             </p>
             <p>{result.right} rätt{result.wrong ? `, ${result.wrong} fel` : ""}. +{result.right} <span aria-hidden="true">⭐</span></p>
             <div className="flex items-center gap-3">
-              <span className="inline-block h-20 w-16 [&>svg]:h-full [&>svg]:w-full" aria-hidden="true" dangerouslySetInnerHTML={{ __html: eggSvg }} />
+              <span className="inline-block h-20 w-16 [&>svg]:h-full [&>svg]:w-full" aria-hidden="true" dangerouslySetInnerHTML={{ __html: result.eggSvg ?? eggSvg ?? "" }} />
               <p className="text-left font-semibold">Du fick ett ägg!</p>
             </div>
             <div className="flex flex-wrap justify-center gap-3">
               <Link href="/spela/samling" className="squish">Kläck ägget</Link>
-              {result.nextStepId && <Link href={`/spela/matte/steg/${result.nextStepId}`} className="squish squish--mjuk">Nästa steg</Link>}
-              <Link href="/spela/matte" className="squish squish--mjuk">Till kartan</Link>
+              {result.arcade && <button className="squish squish--mjuk" onClick={begin} disabled={pending}>Spela igen</button>}
+              {result.arcade && <Link href="/spela/spel" className="squish squish--mjuk">Alla spel</Link>}
+              {!result.arcade && result.nextStepId && <Link href={`/spela/matte/steg/${result.nextStepId}`} className="squish squish--mjuk">Nästa steg</Link>}
+              {!result.arcade && <Link href="/spela/matte" className="squish squish--mjuk">Till kartan</Link>}
             </div>
           </>
         ) : (
@@ -94,7 +101,7 @@ export function RoundPlayer({ stepId, eggSvg }: { stepId: string; eggSvg: string
             <p>{result.right} rätt. Hjärtana tog slut den här gången, men allt du övade på räknas. Försök igen!</p>
             <div className="flex flex-wrap justify-center gap-3">
               <button className="squish" onClick={begin} disabled={pending}>Försök igen</button>
-              <Link href="/spela/matte" className="squish squish--mjuk">Till kartan</Link>
+              <Link href={arcade ? "/spela/spel" : "/spela/matte"} className="squish squish--mjuk">{arcade ? "Alla spel" : "Till kartan"}</Link>
             </div>
           </>
         )}
@@ -113,7 +120,7 @@ export function RoundPlayer({ stepId, eggSvg }: { stepId: string; eggSvg: string
           <span aria-hidden="true">{"♥".repeat(Math.max(0, lives))}</span>
           <span aria-hidden="true" className="opacity-25">{"♥".repeat(Math.max(0, round.step.lives - lives))}</span>
         </span>
-        <Link href="/spela/matte" className="lank text-sm">Avsluta</Link>
+        <Link href={arcade ? "/spela/spel" : "/spela/matte"} className="lank text-sm">Avsluta</Link>
       </div>
       <Game key={i} q={q} seconds={round.step.seconds} onAnswer={onAnswer} index={i} buddySvg={round.buddySvg} kross={round.kross} />
     </section>

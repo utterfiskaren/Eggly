@@ -73,3 +73,13 @@ describe("Vem är störst?", () => {
     expect(pickPartner(() => 0.9, 10, [{ answer: 10 }], new Set())).toBe(0);
   });
 });
+
+import { ARCADE_LEVELS, ARCADE_OPS, arcadeSkills } from "@eggly/content";
+import { MATH_SKILLS_WITH_TEMPLATES } from "../src";
+
+describe("Alla spel och mattemallarna", () => {
+  it("varje färdighet på varje nivå har mallar", () => {
+    const has = new Set(MATH_SKILLS_WITH_TEMPLATES);
+    for (const l of ARCADE_LEVELS) for (const o of ARCADE_OPS) for (const k of arcadeSkills(l.level, o.id)) expect(has.has(k), `${l.level} ${o.id} ${k}`).toBe(true);
+  });
+});

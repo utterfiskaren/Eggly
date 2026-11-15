@@ -81,9 +81,12 @@ export default async function Page() {
         <Link href="/spela/samling" className={`squish squish--liten ${w.eggs.length ? "" : "squish--mjuk"}`}>{w.eggs.length ? "Kläck" : "Samlingen"}</Link>
       </div>
 
-      <Link href={`/spela/matte/steg/${w.steps[w.current].id}`} className="squish self-center">
-        Spela steg {w.current + 1}: {w.steps[w.current].title}
-      </Link>
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <Link href={`/spela/matte/steg/${w.steps[w.current].id}`} className="squish">
+          Spela steg {w.current + 1}: {w.steps[w.current].title}
+        </Link>
+        <Link href="/spela/spel" className="squish squish--mjuk">Alla spel</Link>
+      </div>
 
       {TIER_ORDER.map((tier, world) => {
         const steps = w.steps.filter((s) => s.world === world);
