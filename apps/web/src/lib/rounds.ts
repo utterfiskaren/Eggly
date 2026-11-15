@@ -1,11 +1,12 @@
 import "server-only";
-import { STEPS, TEMPO, mathSkills, roundStars, type GameId, type Step } from "@eggly/content";
+import { STEPS, TEMPO, TIER_RANK, mathSkills, roundStars, speciesById, squishySvg, type GameId, type Step } from "@eggly/content";
 import {
-  MATH_SKILLS_WITH_TEMPLATES, distractors, emptySkill, entryGradeFor, hashSeed, mathTemplates, newSession, planRound,
-  recordAnswer, seededRng, type ChildModel, type Planned, type Representation, type SessionState, type SkillState, type Visual,
+  MATH_SKILLS_WITH_TEMPLATES, distractors, emptySkill, entryGradeFor, hashSeed, kioskLevel, kioskTask, krossMode, mathTemplates,
+  newSession, pickPartner, planRound, recordAnswer, seededRng,
+  type ChildModel, type KrossMode, type Planned, type Representation, type SessionState, type SkillState, type Visual,
 } from "@eggly/engine";
 import { supabaseAdmin } from "./supabase/admin";
-import { clearStep, openStep } from "./world";
+import { clearStep, collection, openStep } from "./world";
 
 /**
  * Omgångar på kartans steg. Minispelen måste kunna rätta direkt (fallande tal, bubblor, klocka),
@@ -22,16 +23,16 @@ const LIVES = [5, 5, 4, 4, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2];
 export const livesFor = (s: Step) => LIVES[Math.min(LIVES.length - 1, s.world)];
 
 /** Spelen som är byggda. Ett steg vars spel inte finns än spelas som det närmaste som finns. */
-export const BUILT: GameId[] = ["rakna", "bubbel", "sant"];
+export const BUILT: GameId[] = ["rakna", "bubbel", "sant", "fanga", "storre", "krossa", "kiosk"];
 const STAND_IN: Record<GameId, GameId> = {
-  rakna: "rakna", bubbel: "bubbel", sant: "sant", minne: "bubbel", fanga: "bubbel", kiosk: "rakna",
-  krossa: "sant", storre: "bubbel", spurt: "rakna", strid: "rakna",
+  rakna: "rakna", bubbel: "bubbel", sant: "sant", minne: "bubbel", fanga: "fanga", kiosk: "kiosk",
+  krossa: "krossa", storre: "storre", spurt: "rakna", strid: "rakna",
 };
 export const playedAs = (g: GameId): GameId => (BUILT.includes(g) ? g : STAND_IN[g]);
 
 const GAME_CFG: Record<GameId, { reps?: Representation[]; n: number }> = {
   rakna: { reps: ["symbol", "missing", "story", "visual"], n: 10 },
-  bubbel: { n: 10 }, sant: { n: 12 }, fanga: { n: 12 }, storre: { n: 10 }, krossa: { n: 10 },
+  bubbel: { n: 10 }, sant: { n: 12 }, fanga: { n: 10 }, storre: { reps: ["symbol"], n: 10 }, krossa: { n: 8 },
   minne: { reps: ["symbol"], n: 6 }, kiosk: { reps: ["symbol", "story"], n: 6 },
   spurt: { reps: ["symbol", "missing"], n: 16 }, strid: { reps: ["symbol", "missing"], n: 12 },
 };
@@ -45,12 +46,20 @@ export interface RoundQuestion {
   visual?: Visual;
   skillTitle: string;
   hints: string[];
+  /** Vem är störst?: uppgiften att jämföra med (bara texten och svaret). */
+  other?: { prompt: string; answer: number };
+  /** Kiosken: texten (**fetstil**) och varans bild. Summan som ska läggas är `answer`. */
+  kiosk?: { say: string; svg: string };
 }
 
 export interface Round {
   roundId: string;
-  step: { id: string; title: string; game: GameId; played: GameId; tempo: number; seconds: number; lives: number; tier: number; index: number };
+  step: { id: string; title: string; game: GameId; played: GameId; tempo: number; seconds: number; lives: number; tier: number; index: number; world: number };
   questions: RoundQuestion[];
+  /** Klämmisen som fångar i Fånga talen: barnets bästa (färdig SVG), eller null om samlingen är tom. */
+  buddySvg?: string | null;
+  /** Talkross: hur rutorna fungerar på det här steget. */
+  kross?: KrossMode;
 }
 
 async function loadChild(childId: string): Promise<ChildModel> {
@@ -77,10 +86,28 @@ function toRoundQuestion(p: Planned, rng: () => number): RoundQuestion {
   };
 }
 
+/** Hur länge ett spel får ta per uppgift, jämfört med stegets tempo (som i Eggly 1). */
+const SECONDS_X: Partial<Record<GameId, number>> = { storre: 1.5, kiosk: 2.4, krossa: 1.6 };
+
+const blank = (): RoundQuestion => ({ prompt: "", input: "number", answer: 0, choices: [], skillTitle: "", hints: [] });
+const EXPR = /=\s*\?$/;
+
+/** Barnets bästa klämmis (högsta nivån), som fångar i Fånga talen. */
+async function loadBuddy(childId: string): Promise<string | null> {
+  const owned = await collection(childId);
+  let best: (typeof owned)[number] | undefined;
+  let bestRank = -1;
+  for (const o of owned) {
+    const rank = TIER_RANK[speciesById(o.squishyId)?.tier ?? 0] ?? 0;
+    if (rank > bestRank) { best = o; bestRank = rank; }
+  }
+  return best ? squishySvg(best.squishyId, best.treats) : null;
+}
+
 export async function startRound(childId: string, stepId: string): Promise<Round | null> {
   const step = await openStep(childId, stepId);
   if (!step) return null;
-  const played = playedAs(step.game);
+  let played = playedAs(step.game);
   const cfg = GAME_CFG[played];
   const db = supabaseAdmin();
   const { data: sess, error } = await db.from("play_sessions")
@@ -91,19 +118,64 @@ export async function startRound(childId: string, stepId: string): Promise<Round
   const session = newSession(sess.id, "aventyr", { skills: step.skills, source: "child_choice" });
   const rng = seededRng(hashSeed(`${sess.id}:${Date.now()}`));
   const n = step.n > 0 ? step.n : cfg.n;
-  const plan = planRound(child, session, n, {
-    now: Date.now(), rng, available: MATH_SKILLS_WITH_TEMPLATES, representations: cfg.reps,
-  });
+  const ctx = { now: Date.now(), rng, available: MATH_SKILLS_WITH_TEMPLATES, representations: cfg.reps };
+
+  let plan: Planned[] = [];
+  let questions: RoundQuestion[];
+  let free = 0;
+  let kross: KrossMode | undefined;
+  let buddySvg: string | null | undefined;
+
+  if (played === "kiosk") {
+    free = n;
+    questions = Array.from({ length: n }, () => {
+      const t = kioskTask(rng, kioskLevel(step.world));
+      return { ...blank(), answer: t.need, prompt: t.say.replaceAll("**", ""), kiosk: { say: t.say, svg: squishySvg(t.itemId) } };
+    });
+  } else if (played === "krossa") {
+    free = n;
+    kross = krossMode(step.world + 1);
+    questions = Array.from({ length: n }, blank);
+  } else if (played === "storre") {
+    // Planera extra uppgifter och para ihop dem. Bara första uppgiften i varje par räknas för barnet.
+    const pool = planRound(child, session, n * 4, ctx).filter((p) => EXPR.test(p.question.prompt) && !p.question.visual);
+    const mine = pool.slice(0, n), rest = pool.slice(n);
+    const taken = new Set<number>();
+    const paired: { a: Planned; b: Planned }[] = [];
+    for (const a of mine) {
+      const at = pickPartner(rng, a.question.answer, rest.map((r) => ({ answer: r.question.answer })), taken);
+      if (at < 0) continue;
+      taken.add(at);
+      paired.push({ a, b: rest[at] });
+    }
+    if (paired.length >= Math.min(4, n)) {
+      plan = paired.map((x) => x.a);
+      questions = paired.map(({ a, b }) => ({
+        ...toRoundQuestion(a, rng), other: { prompt: b.question.prompt, answer: b.question.answer },
+      }));
+    } else {
+      // Motorn hittade för få uppgifter att jämföra (t.ex. bara bildfrågor på det här stoppet): spela som Bubbelpop.
+      played = "bubbel";
+      plan = planRound(child, session, n, { ...ctx, representations: undefined });
+      questions = plan.map((p) => toRoundQuestion(p, rng));
+    }
+  } else {
+    plan = planRound(child, session, n, ctx);
+    questions = plan.map((p) => toRoundQuestion(p, rng));
+    if (played === "fanga") buddySvg = await loadBuddy(childId);
+  }
+
   await db.from("pending_questions").insert({
-    session_id: sess.id, child_id: childId, item_index: 0, planned: { round: plan, step: step.id },
+    session_id: sess.id, child_id: childId, item_index: 0, planned: { round: plan, step: step.id, free },
   });
   return {
     roundId: sess.id,
     step: {
-      id: step.id, title: step.title, game: step.game, played, tempo: step.tempo, seconds: TEMPO[step.tempo].sec,
-      lives: livesFor(step), tier: step.tier, index: step.index,
+      id: step.id, title: step.title, game: step.game, played, tempo: step.tempo,
+      seconds: Math.round(TEMPO[step.tempo].sec * (SECONDS_X[played] ?? 1) * 10) / 10,
+      lives: livesFor(step), tier: step.tier, index: step.index, world: step.world,
     },
-    questions: plan.map((p) => toRoundQuestion(p, rng)),
+    questions, buddySvg, kross,
   };
 }
 
@@ -126,13 +198,14 @@ export async function finishRound(childId: string, roundId: string, answers: Rou
   const db = supabaseAdmin();
   const { data: removed } = await db.from("pending_questions").delete()
     .eq("session_id", roundId).eq("child_id", childId).select("planned");
-  const pending = removed?.[0]?.planned as { round: Planned[]; step: string } | undefined;
+  const pending = removed?.[0]?.planned as { round: Planned[]; step: string; free?: number } | undefined;
   if (!pending) return null;
   const step = STEPS.find((s) => s.id === pending.step);
   if (!step) return null;
 
   const plan = pending.round;
-  const given = answers.slice(0, plan.length);
+  // Spel utan mattemallar (Kiosken, Talkross) räknas för stjärnor och steg men inte för barnets modell.
+  const given = answers.slice(0, pending.free ? pending.free : plan.length);
   const now = Date.now();
   let child = await loadChild(childId);
   let session: SessionState = newSession(roundId, "aventyr", { skills: step.skills, source: "child_choice" });
@@ -140,6 +213,7 @@ export async function finishRound(childId: string, roundId: string, answers: Rou
   const attempts: Record<string, unknown>[] = [];
   given.forEach((a, i) => {
     const p = plan[i];
+    if (!p) return;
     const hint = Math.max(0, Math.min(3, Math.floor(a.hint ?? 0)));
     const out = recordAnswer(child, session, p, !!a.correct, hint, now);
     child = out.child; session = out.session; touched.add(p.question.skillId);

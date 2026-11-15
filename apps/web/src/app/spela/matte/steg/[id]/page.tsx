@@ -14,6 +14,10 @@ const HOW: Record<string, string> = {
   rakna: "Skriv svaret med knapparna.",
   bubbel: "Tryck på bubblan med rätt svar.",
   sant: "Stämmer svaret? Tryck Rätt eller Fel.",
+  fanga: "Flytta fångaren under talet som är rätt svar och fånga det.",
+  storre: "Vilket blir störst? Räkna ut båda, eller tryck Lika mycket.",
+  krossa: "Tryck på rutor som tillsammans blir målet.",
+  kiosk: "Lägg upp exakt rätt pengar, eller ge rätt växel.",
 };
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {

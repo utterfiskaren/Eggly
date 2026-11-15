@@ -7,9 +7,15 @@ import type { Round, RoundAnswer, RoundResult } from "@/lib/rounds";
 import { Rakna } from "./games/Rakna";
 import { Bubbel } from "./games/Bubbel";
 import { Sant } from "./games/Sant";
+import { Fanga } from "./games/Fanga";
+import { Storre } from "./games/Storre";
+import { Krossa } from "./games/Krossa";
+import { Kiosk } from "./games/Kiosk";
 import type { GameProps } from "./games/types";
 
-const GAMES: Record<string, (p: GameProps) => React.ReactNode> = { rakna: Rakna, bubbel: Bubbel, sant: Sant };
+const GAMES: Record<string, (p: GameProps) => React.ReactNode> = {
+  rakna: Rakna, bubbel: Bubbel, sant: Sant, fanga: Fanga, storre: Storre, krossa: Krossa, kiosk: Kiosk,
+};
 
 /**
  * Spelar en omgång på ett steg: hämtar uppgifterna, visar rätt minispel, håller koll på hjärtan
@@ -109,7 +115,7 @@ export function RoundPlayer({ stepId, eggSvg }: { stepId: string; eggSvg: string
         </span>
         <Link href="/spela/matte" className="lank text-sm">Avsluta</Link>
       </div>
-      <Game key={i} q={q} seconds={round.step.seconds} onAnswer={onAnswer} index={i} />
+      <Game key={i} q={q} seconds={round.step.seconds} onAnswer={onAnswer} index={i} buddySvg={round.buddySvg} kross={round.kross} />
     </section>
   );
 }
