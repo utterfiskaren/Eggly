@@ -76,3 +76,20 @@ export function hatchFromTier(owned: string[], tier: number, rnd: () => number =
   for (let i = 0; i < pool.length; i++) { x -= w[i]; if (x <= 0) { pick = pool[i]; break; } }
   return { id: pick.id, tier: t, treats: art.rollTreats(t), seed: Math.floor(rnd() * 2147483647) };
 }
+
+export interface Stats { mj: number; st: number; gl: number; kl: number; kraft: number }
+
+/** Mjukhet, Studs, Glitter och Klurighet. Mjukhet tål smällar, Studs slår hårdare, Glitter ger superslag, Klurighet ger mer tid. */
+export function squishyStats(id: string, seed: number, treats: Treats = {}): Stats {
+  return art.statsOf(id, seed, treats) as Stats;
+}
+
+/** Grundstyrkan för en nivå (index i TIERS). Bossens styrka räknas från den. */
+export function tierBase(tier: number): number {
+  return art.TIER_BASE[tier] ?? 10;
+}
+
+/** Bossen i en värld (index = äggnivå): SVG-text, arg. */
+export function bossSvg(tier: number): string {
+  return art.sqSVG("boss" + Math.max(0, Math.min(13, tier)), { angry: true });
+}

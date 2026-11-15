@@ -30,7 +30,7 @@ export async function startaFrittSpel(game: string, op: string, level: number, t
 /** Skickar omgångens svar (bara rätt eller fel per uppgift, i ordning). */
 export async function avslutaSteg(roundId: string, answers: RoundAnswer[], completed: boolean): Promise<RoundResult | null> {
   const clean = (Array.isArray(answers) ? answers : []).slice(0, 60)
-    .map((a) => ({ correct: a?.correct === true, hint: Number(a?.hint) || 0 }));
+    .map((a) => ({ correct: a?.correct === true, hint: Number(a?.hint) || 0, ...(Number.isInteger(a?.i) ? { i: a.i } : {}) }));
   return finishRound(await childId(), String(roundId).slice(0, 40), clean, completed === true);
 }
 

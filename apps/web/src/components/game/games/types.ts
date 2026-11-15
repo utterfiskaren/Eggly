@@ -12,3 +12,21 @@ export interface GameProps {
   /** Talkross: hur rutorna fungerar på det här steget. */
   kross?: { mul: boolean; k: number; hi: number };
 }
+
+import type { RoundAnswer } from "@/lib/rounds";
+
+/** Spel som spelas på en skärm med alla uppgifter på en gång: Minnet, Spurten och Striden. */
+export interface BoardProps {
+  questions: RoundQuestion[];
+  /** Hela klockan i sekunder (Minnet, Spurten). 0 = ingen klocka. */
+  clock: number;
+  /** Sekunder per uppgift (Striden). */
+  seconds: number;
+  /** Spurten: så många rätt krävs. */
+  goal: number;
+  hero?: { svg: string; name: string; stats: { mj: number; st: number; gl: number; kl: number; kraft: number } };
+  boss?: { name: string; svg: string };
+  fight?: { maxB: number; hit: number; maxH: number; baseD: number; crit: number; timeX: number };
+  /** Skickar svaren (med uppgiftens plats i `i`) och om rundan nåddes till slut. */
+  onDone: (answers: RoundAnswer[], completed: boolean) => void;
+}

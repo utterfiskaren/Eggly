@@ -83,3 +83,39 @@ describe("Alla spel och mattemallarna", () => {
     for (const l of ARCADE_LEVELS) for (const o of ARCADE_OPS) for (const k of arcadeSkills(l.level, o.id)) expect(has.has(k), `${l.level} ${o.id} ${k}`).toBe(true);
   });
 });
+
+import { fightNumbers, minneClock, spurtPassed, spurtPlan, spurtStars } from "../src";
+
+describe("Spurten", () => {
+  it("har alltid klocka och ett mål som växer med världen", () => {
+    expect(spurtPlan(0, 0)).toEqual(spurtPlan(1, 0));
+    expect(spurtPlan(1, 0)).toEqual({ total: 120, goal: 12 });
+    expect(spurtPlan(4, 0).total).toBe(40);
+    for (let t = 1; t <= 4; t++) expect(spurtPlan(t, 7).goal).toBeLessThanOrEqual(spurtPlan(t, 0).goal);
+    expect(spurtPlan(4, 13).goal).toBeGreaterThanOrEqual(4);
+  });
+  it("klaras med målet och ger fler stjärnor över det", () => {
+    expect(spurtPassed(11, 12)).toBe(false);
+    expect(spurtPassed(12, 12)).toBe(true);
+    expect([12, 14, 15, 17, 20].map((r) => spurtStars(r, 12))).toEqual([1, 2, 3, 4, 5]);
+  });
+});
+
+describe("Minnet och Striden", () => {
+  it("Minnet: ingen klocka utan tempo, och längre tid på högre nivåer", () => {
+    expect(minneClock(0, 0, 6)).toBe(0);
+    expect(minneClock(1, 0, 6)).toBe(60);
+    expect(minneClock(1, 6, 6)).toBe(84);
+  });
+  it("Striden: starkare kämpe ger mer liv, skada och tid, men högst 40 % superslag", () => {
+    const weak = fightNumbers(100, { mj: 50, st: 50, gl: 50, kl: 50 });
+    const strong = fightNumbers(100, { mj: 400, st: 400, gl: 4000, kl: 400 });
+    expect(strong.maxH).toBeGreaterThan(weak.maxH);
+    expect(strong.baseD).toBeGreaterThan(weak.baseD);
+    expect(strong.timeX).toBeGreaterThan(weak.timeX);
+    expect(weak.maxB).toBe(800);
+    expect(weak.hit).toBe(90);
+    expect(strong.crit).toBeLessThanOrEqual(40);
+    expect(weak.crit).toBeGreaterThanOrEqual(10);
+  });
+});

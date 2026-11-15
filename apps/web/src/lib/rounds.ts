@@ -1,12 +1,13 @@
 import "server-only";
 import {
-  GAME_NAMES, STEPS, TEMPO, TIER_RANK, arcadeEggTier, arcadeLives, arcadeSkills, eggSvg, mathSkills, roundStars, speciesById, squishySvg,
-  type ArcadeOp, type GameId, type Step,
+  GAME_NAMES, STEPS, TEMPO, TIER_RANK, WORLD_BOSSES, arcadeEggTier, arcadeLives, arcadeSkills, bossSvg, eggSvg, mathSkills, roundStars,
+  speciesById, squishySvg, squishyStats, tierBase,
+  type ArcadeOp, type GameId, type Step, type Stats,
 } from "@eggly/content";
 import {
-  MATH_SKILLS_WITH_TEMPLATES, distractors, emptySkill, entryGradeFor, hashSeed, kioskLevel, kioskTask, krossMode, mathTemplates,
-  newSession, pickPartner, planRound, recordAnswer, seededRng,
-  type ChildModel, type KrossMode, type Planned, type Representation, type SessionState, type SkillState, type Visual,
+  MATH_SKILLS_WITH_TEMPLATES, distractors, emptySkill, entryGradeFor, fightNumbers, hashSeed, kioskLevel, kioskTask, krossMode,
+  mathTemplates, minneClock, newSession, pickPartner, planRound, recordAnswer, seededRng, spurtPlan, spurtStars,
+  type ChildModel, type FightNumbers, type KrossMode, type Planned, type Representation, type SessionState, type SkillState, type Visual,
 } from "@eggly/engine";
 import { supabaseAdmin } from "./supabase/admin";
 import { clearStep, collection, openStep } from "./world";
@@ -26,10 +27,10 @@ const LIVES = [5, 5, 4, 4, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2];
 export const livesFor = (s: Step) => LIVES[Math.min(LIVES.length - 1, s.world)];
 
 /** Spelen som är byggda. Ett steg vars spel inte finns än spelas som det närmaste som finns. */
-export const BUILT: GameId[] = ["rakna", "bubbel", "sant", "fanga", "storre", "krossa", "kiosk"];
+export const BUILT: GameId[] = ["rakna", "bubbel", "sant", "fanga", "storre", "krossa", "kiosk", "minne", "spurt", "strid"];
 const STAND_IN: Record<GameId, GameId> = {
-  rakna: "rakna", bubbel: "bubbel", sant: "sant", minne: "bubbel", fanga: "fanga", kiosk: "kiosk",
-  krossa: "krossa", storre: "storre", spurt: "rakna", strid: "rakna",
+  rakna: "rakna", bubbel: "bubbel", sant: "sant", minne: "minne", fanga: "fanga", kiosk: "kiosk",
+  krossa: "krossa", storre: "storre", spurt: "spurt", strid: "strid",
 };
 export const playedAs = (g: GameId): GameId => (BUILT.includes(g) ? g : STAND_IN[g]);
 
@@ -37,7 +38,8 @@ const GAME_CFG: Record<GameId, { reps?: Representation[]; n: number }> = {
   rakna: { reps: ["symbol", "missing", "story", "visual"], n: 10 },
   bubbel: { n: 10 }, sant: { n: 12 }, fanga: { n: 10 }, storre: { reps: ["symbol"], n: 10 }, krossa: { n: 8 },
   minne: { reps: ["symbol"], n: 6 }, kiosk: { reps: ["symbol", "story"], n: 6 },
-  spurt: { reps: ["symbol", "missing"], n: 16 }, strid: { reps: ["symbol", "missing"], n: 12 },
+  // Spurten och Striden behöver många uppgifter i reserv: hur många som går åt beror på barnet.
+  spurt: { reps: ["symbol", "missing"], n: 60 }, strid: { reps: ["symbol", "missing"], n: 40 },
 };
 
 export interface RoundQuestion {
@@ -65,6 +67,14 @@ export interface Round {
   kross?: KrossMode;
   /** Sant om omgången är ett spel från Alla spel och inte ett steg på kartan. */
   arcade?: boolean;
+  /** Minnet och Spurten: hela klockan i sekunder (0 = ingen klocka). */
+  clock?: number;
+  /** Spurten: så många rätt krävs. */
+  goal?: number;
+  /** Striden: kämpen (barnets starkaste klämmis), bossen och siffrorna för kampen. */
+  hero?: { svg: string; name: string; stats: Stats };
+  boss?: { name: string; svg: string };
+  fight?: FightNumbers;
 }
 
 async function loadChild(childId: string): Promise<ChildModel> {
@@ -116,6 +126,19 @@ interface RoundSpec {
   arcade?: boolean;
 }
 
+/** Kämpen i Striden: barnets starkaste klämmis. Utan klämmis (inget ägg kläckt än) en startkatt. */
+async function loadFighter(childId: string): Promise<{ svg: string; name: string; stats: Stats }> {
+  const owned = await collection(childId);
+  let best: { svg: string; name: string; stats: Stats } | undefined;
+  for (const o of owned) {
+    const stats = squishyStats(o.squishyId, o.seed, o.treats);
+    if (!best || stats.kraft > best.stats.kraft) best = { svg: squishySvg(o.squishyId, o.treats), name: speciesById(o.squishyId)?.name ?? "Klämmis", stats };
+  }
+  if (best) return best;
+  const treats = { bow: "rosett" };
+  return { svg: squishySvg("mochi", treats), name: "Mochi-katten", stats: squishyStats("mochi", 0, treats) };
+}
+
 export async function startRound(childId: string, stepId: string): Promise<Round | null> {
   const step = await openStep(childId, stepId);
   if (!step) return null;
@@ -158,6 +181,8 @@ async function buildRound(childId: string, step: RoundSpec): Promise<Round | nul
   let free = 0;
   let kross: KrossMode | undefined;
   let buddySvg: string | null | undefined;
+  let clock: number | undefined, goal: number | undefined, noLives = false;
+  let hero: Round["hero"], boss: Round["boss"], fight: FightNumbers | undefined;
 
   if (played === "kiosk") {
     free = n;
@@ -192,6 +217,35 @@ async function buildRound(childId: string, step: RoundSpec): Promise<Round | nul
       plan = planRound(child, session, n, { ...ctx, representations: undefined });
       questions = plan.map((p) => toRoundQuestion(p, rng));
     }
+  } else if (played === "minne") {
+    // Par av uppgift och svar. Alla svar måste vara olika, annars går paren inte att skilja åt.
+    const pairs = Math.max(4, Math.min(8, n));
+    const seen = new Set<number>();
+    const chosen = planRound(child, session, pairs * 5, ctx)
+      .filter((p) => EXPR.test(p.question.prompt) && !p.question.visual && !seen.has(p.question.answer) && !!seen.add(p.question.answer))
+      .slice(0, pairs);
+    if (chosen.length >= 4) {
+      plan = chosen;
+      questions = plan.map((p) => toRoundQuestion(p, rng));
+      clock = minneClock(step.tempo, step.world, plan.length);
+      noLives = true;
+    } else {
+      played = "bubbel";
+      plan = planRound(child, session, n, { ...ctx, representations: undefined });
+      questions = plan.map((p) => toRoundQuestion(p, rng));
+    }
+  } else if (played === "spurt") {
+    const sp = spurtPlan(step.tempo, step.world);
+    plan = planRound(child, session, n, ctx);
+    questions = plan.map((p) => toRoundQuestion(p, rng));
+    clock = sp.total; goal = sp.goal; noLives = true;
+  } else if (played === "strid") {
+    plan = planRound(child, session, n, ctx);
+    questions = plan.map((p) => toRoundQuestion(p, rng));
+    hero = await loadFighter(childId);
+    boss = { name: WORLD_BOSSES[step.tier] ?? "Bossen", svg: bossSvg(step.tier) };
+    fight = fightNumbers(tierBase(step.tier), hero.stats);
+    noLives = true;
   } else {
     plan = planRound(child, session, n, ctx);
     questions = plan.map((p) => toRoundQuestion(p, rng));
@@ -200,20 +254,24 @@ async function buildRound(childId: string, step: RoundSpec): Promise<Round | nul
 
   await db.from("pending_questions").insert({
     session_id: sess.id, child_id: childId, item_index: 0,
-    planned: { round: plan, step: step.id, free, ...(step.arcade ? { arcade: { tier: step.tier, lives: step.lives, skills: step.skills } } : {}) },
+    planned: {
+      round: plan, step: step.id, free, game: played, noLives, ...(goal ? { goal } : {}),
+      ...(step.arcade ? { arcade: { tier: step.tier, lives: step.lives, skills: step.skills } } : {}),
+    },
   });
   return {
     roundId: sess.id,
     step: {
       id: step.id, title: step.title, game: step.game, played, tempo: step.tempo,
-      seconds: Math.round(TEMPO[step.tempo].sec * (SECONDS_X[played] ?? 1) * 10) / 10,
-      lives: step.lives, tier: step.tier, index: step.index, world: step.world,
+      seconds: Math.round(TEMPO[step.tempo].sec * (SECONDS_X[played] ?? 1) * (fight?.timeX ?? 1) * 10) / 10,
+      lives: noLives ? 0 : step.lives, tier: step.tier, index: step.index, world: step.world,
     },
-    questions, buddySvg, kross, arcade: step.arcade ? true : undefined,
+    questions, buddySvg, kross, arcade: step.arcade ? true : undefined, clock, goal, hero, boss, fight,
   };
 }
 
-export interface RoundAnswer { correct: boolean; hint?: number }
+/** `i` är uppgiftens plats i omgången. Utan `i` räknas svaren i den ordning de kommer (Minnet skickar bara de par som hittades). */
+export interface RoundAnswer { correct: boolean; hint?: number; i?: number }
 export interface RoundResult {
   passed: boolean;
   right: number;
@@ -236,7 +294,7 @@ export async function finishRound(childId: string, roundId: string, answers: Rou
   const { data: removed } = await db.from("pending_questions").delete()
     .eq("session_id", roundId).eq("child_id", childId).select("planned");
   const pending = removed?.[0]?.planned as
-    { round: Planned[]; step: string; free?: number; arcade?: { tier: number; lives: number; skills: string[] } } | undefined;
+    { round: Planned[]; step: string; free?: number; game?: GameId; goal?: number; noLives?: boolean; arcade?: { tier: number; lives: number; skills: string[] } } | undefined;
   if (!pending) return null;
   const step = pending.arcade ? undefined : STEPS.find((s) => s.id === pending.step);
   if (!pending.arcade && !step) return null;
@@ -245,13 +303,23 @@ export async function finishRound(childId: string, roundId: string, answers: Rou
 
   const plan = pending.round;
   // Spel utan mattemallar (Kiosken, Talkross) räknas för stjärnor och steg men inte för barnets modell.
-  const given = answers.slice(0, pending.free ? pending.free : plan.length);
+  const limit = pending.free ? pending.free : plan.length;
+  const taken = new Set<number>();
+  const given: (RoundAnswer & { at: number })[] = [];
+  answers.forEach((a, pos) => {
+    const at = Number.isInteger(a.i) ? (a.i as number) : pos;
+    if (at < 0 || at >= limit || taken.has(at)) return;
+    taken.add(at);
+    given.push({ ...a, at });
+  });
+  given.sort((x, y) => x.at - y.at);
   const now = Date.now();
   let child = await loadChild(childId);
   let session: SessionState = newSession(roundId, "aventyr", { skills: skillsFocus, source: "child_choice" });
   const touched = new Set<string>();
   const attempts: Record<string, unknown>[] = [];
-  given.forEach((a, i) => {
+  given.forEach((a) => {
+    const i = a.at;
     const p = plan[i];
     if (!p) return;
     const hint = Math.max(0, Math.min(3, Math.floor(a.hint ?? 0)));
@@ -267,7 +335,9 @@ export async function finishRound(childId: string, roundId: string, answers: Rou
 
   const right = given.filter((a) => a.correct).length;
   const wrong = given.length - right;
-  const passed = completed && given.length > 0 && wrong < lives;
+  const goal = pending.goal ?? 0;
+  const passed = completed && given.length > 0
+    && (pending.game === "spurt" ? right >= goal : pending.noLives ? true : wrong < lives);
 
   const writes: PromiseLike<unknown>[] = [];
   for (const id of touched) {
@@ -286,7 +356,7 @@ export async function finishRound(childId: string, roundId: string, answers: Rou
   writes.push(db.from("play_sessions").update({ state: session, items_done: given.length, ended_at: new Date(now).toISOString() }).eq("id", roundId));
   await Promise.all(writes);
 
-  const stars = roundStars(right, wrong);
+  const stars = pending.game === "spurt" ? spurtStars(right, goal) : roundStars(right, wrong);
   if (!passed) return { passed, right, wrong, stars: 0, best: 0 };
   if (pending.arcade) {
     // Fritt spel ger ett ägg efter nivå och tempo. Nyckeln gör att samma omgång aldrig kan ge två ägg.

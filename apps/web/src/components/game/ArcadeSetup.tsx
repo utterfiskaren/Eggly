@@ -22,7 +22,7 @@ interface Props {
 export function ArcadeSetup({ game, levels, ops, opsByLevel, lives, tempos, tierOf, eggs, usesOp }: Props) {
   const [op, setOp] = useState("mix");
   const [level, setLevel] = useState(1);
-  const [tempo, setTempo] = useState(0);
+  const [tempo, setTempo] = useState(game === "spurt" ? 1 : 0);
   const [active, setActive] = useState(false);
   const here = levels[level - 1];
   const egg = eggs[tierOf[level - 1][tempo]];
@@ -62,14 +62,14 @@ export function ArcadeSetup({ game, levels, ops, opsByLevel, lives, tempos, tier
               ))}
             </div>
             <p className="mt-2"><strong>Nivå {here.level}: {here.name}</strong> <span className="hjalptext">(ungefär {here.stage})</span></p>
-            <p className="hjalptext">{here.blurb} Hjärtan: <span aria-label={`${lives[level - 1]}`}>{"♥".repeat(lives[level - 1])}</span></p>
+            <p className="hjalptext">{here.blurb}{lives[level - 1] > 0 && <> Hjärtan: <span aria-label={`${lives[level - 1]}`}>{"♥".repeat(lives[level - 1])}</span></>}</p>
             <p className="hjalptext mt-1">Fler nivåer kommer när fler sorters uppgifter är klara.</p>
           </div>
           <div>
             <h2 className="etikett">Tid</h2>
             <div className="flex flex-wrap gap-2" role="group" aria-label="Tempo">
               {tempos.map((t, i) => (
-                <button key={t.name} type="button" className={chip(tempo === i)} aria-pressed={tempo === i} onClick={() => setTempo(i)}>{t.name}</button>
+                <button key={t.name} type="button" className={chip(tempo === i)} aria-pressed={tempo === i} onClick={() => setTempo(i)} disabled={game === "spurt" && i === 0}>{t.name}</button>
               ))}
             </div>
           </div>

@@ -753,4 +753,24 @@ function eggSVG(T, cr = 0) {
 /* =========================================================
    MATTEMOTORN: uppgifter, anpassning och repetition
    ========================================================= */
-export { TIERS, TORDER, RANK, SQ, SQ_BY, SLOTS, SLOT_NAME, TREATS, TREAT_BY, SKINS, SKIN_BY, RAR_NAME, RAR_COL, sqSVG, eggSVG, rollTreats, TAPS };
+/* ---------- bossar och krafter (Striden) ---------- */
+const BOSSES = [
+  ['Surpuppan', 'blob', '#d7c2a2', '#a8875d', 0], ['Griniga Grete', 'pig', '#c6ccd6', '#9aa4b2', 1], ['Bråk-Bosse', 'bear', '#e8c15a', '#c8942a', 2],
+  ['Isgnället', 'seal', '#c0e6f2', '#8cc9dd', 3], ['Färgtjuven', 'fox', '#d7b8ee', '#fff', 4], ['Drottning Sur', 'cat', '#f09ad0', '#d05a9f', 5],
+  ['Skuggkungen', 'bat', '#2a2042', '#5b3d99', 6], ['Dimmspöket', 'ghost', '#cfe4ee', '#a0c4d6', 7], ['Eldjätten', 'dragon', '#e86a2a', '#b82a1a', 8],
+  ['Skurmonstret', 'blob', '#f3e27a', '#c9a82a', 9], ['Rex Rasande', 'dino', '#7fcf5e', '#3a7a2a', 10], ['Drömtjuven', 'unicorn', '#5a4a8a', '#2a1f4a', 11],
+  ['Skuggängeln', 'ghost', '#e9e0ff', '#9a86d0', 12], ['Kosmos-Kungen', 'dragon', '#5a2fd0', '#14083a', 13]
+].map((b, i) => ({ id: 'boss' + i, name: b[0], kind: b[1], c: b[2], d: b[3], tier: b[4], txt: '' }));
+BOSSES.forEach(b => { SQ_BY[b.id] = b; });
+
+function srand(seed, i) { let h = Math.imul(seed ^ Math.imul(i + 1, 0x9E3779B1), 0x85EBCA6B); h ^= h >>> 13; h = Math.imul(h, 0xC2B2AE35); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
+/** Mjukhet, Studs, Glitter och Klurighet för en klämmis: grundvärdet för nivån, lite slump från fröet, plus bonus från kläderna. */
+function statsOf(speciesId, seed, treats) {
+  const T = (SQ_BY[speciesId] || SQ[0]).tier, B = TIER_BASE[T], o = {};
+  STAT_KEYS.forEach((k, i) => { o[k] = Math.round(B * (0.8 + 0.4 * srand(seed | 0, i))); });
+  for (const slot in treats || {}) { const tr = TREAT_BY[treats[slot]]; if (tr) for (const k in tr.bon) o[k] += tr.bon[k]; }
+  o.kraft = o.mj + o.st + o.gl + o.kl;
+  return o;
+}
+
+export { TIERS, TORDER, RANK, SQ, SQ_BY, SLOTS, SLOT_NAME, TREATS, TREAT_BY, SKINS, SKIN_BY, RAR_NAME, RAR_COL, sqSVG, eggSVG, rollTreats, TAPS, BOSSES, TIER_BASE, statsOf };

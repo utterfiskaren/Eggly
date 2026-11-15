@@ -18,6 +18,9 @@ const HOW: Record<string, string> = {
   storre: "Vilket blir störst? Räkna ut båda, eller tryck Lika mycket.",
   krossa: "Tryck på rutor som tillsammans blir målet.",
   kiosk: "Lägg upp exakt rätt pengar, eller ge rätt växel.",
+  minne: "Vänd två kort i taget och hitta uppgiften och dess svar. Alla par innan klockan tar slut.",
+  spurt: "Svara på så många du hinner innan klockan tar slut. Nå målet för att klara steget.",
+  strid: "Rätt svar slår bossen, fel svar slår dig. Din klämmis krafter avgör hur du klarar dig.",
 };
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {

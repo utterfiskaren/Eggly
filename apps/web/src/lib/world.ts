@@ -112,13 +112,13 @@ export async function hatch(childId: string): Promise<HatchView | null> {
   return { id: pick.id, name: sp.name, tierName: TIERS[pick.tier].name, txt: sp.txt, svg: squishySvg(pick.id, pick.treats) };
 }
 
-export interface Owned { squishyId: string; treats: Treats; obtainedAt: string; legacy: boolean }
+export interface Owned { squishyId: string; treats: Treats; obtainedAt: string; legacy: boolean; seed: number }
 
 export async function collection(childId: string): Promise<Owned[]> {
   const { data } = await supabaseAdmin().from("owned_squishies").select("squishy_id, customization, obtained_at")
     .eq("child_id", childId).order("obtained_at", { ascending: false });
   return (data ?? []).map((r) => {
-    const c = (r.customization ?? {}) as { treats?: Treats; legacy?: boolean };
-    return { squishyId: r.squishy_id as string, treats: c.treats ?? {}, obtainedAt: r.obtained_at as string, legacy: !!c.legacy };
+    const c = (r.customization ?? {}) as { treats?: Treats; legacy?: boolean; seed?: number };
+    return { squishyId: r.squishy_id as string, treats: c.treats ?? {}, obtainedAt: r.obtained_at as string, legacy: !!c.legacy, seed: Number(c.seed) || 0 };
   });
 }
