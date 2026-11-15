@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { RoundPlayer } from "./RoundPlayer";
 
@@ -37,9 +38,11 @@ export function OvaSetup({ tempos }: { tempos: { name: string; sec: number }[] }
                 <button key={t} type="button" className={chip(tables.includes(t))} aria-pressed={tables.includes(t)} onClick={() => toggleTable(t)}>{t}</button>
               ))}
             </div>
-            <button type="button" className="squish self-start" disabled={!tables.length} onClick={() => go("tables", { tables })}>
+            <div className="flex flex-wrap gap-2"><button type="button" className="squish self-start" disabled={!tables.length} onClick={() => go("tables", { tables })}>
               Öva {tables.length === 1 ? `${tables[0]}:ans tabell` : "valda tabeller"}
             </button>
+            {tables.length === 1 && <Link href={`/spela/ova/tabell/${tables[0]}`} className="squish squish--mjuk self-start">Titta på tabellen</Link>}
+            </div>
           </div>
           {(["add", "sub"] as const).map((k) => (
             <div key={k} className="kort flex flex-col gap-3 p-4">
