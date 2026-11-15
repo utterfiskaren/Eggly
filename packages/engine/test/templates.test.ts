@@ -105,6 +105,20 @@ function checkByPrompt(q: Question): boolean | null {
   if (m) return A === +m[3] - +m[1] * +m[2];
   m = q.prompt.match(/^\S+ har (\d+) bär och får (\d+) till\. De delas lika mellan (\d+) kompisar\. Hur många bär får var och en\?$/);
   if (m) return (+m[1] + +m[2]) % +m[3] === 0 && A * +m[3] === +m[1] + +m[2];
+  // Bildfrågor: klockan och stapeldiagram. Facit kontrolleras mot bilden.
+  const cl = q.visual?.kind === "clock" ? q.visual : null;
+  if (q.prompt === "Klockan visar en hel timme. Vilken timme är det? Skriv timmen.") return !!cl && cl.m === 0 && A === cl.h;
+  if (q.prompt === "Klockan visar halv. Vilket tal kommer efter «halv»? Skriv timmen.") return !!cl && cl.m === 30 && A === (cl.h % 12) + 1;
+  if (q.prompt === "Hur många minuter efter hel timme visar klockan?") return !!cl && cl.m % 5 === 0 && cl.m > 0 && A === cl.m;
+  if (q.prompt === "Hur många minuter är det kvar till nästa hela timme?") return !!cl && cl.m % 5 === 0 && cl.m > 0 && A === 60 - cl.m;
+  if (q.prompt.startsWith("Diagrammet visar antal bilar.")) {
+    if (q.visual?.kind !== "bars") return false;
+    const v = Object.fromEntries(q.visual.labels.map((l, i) => [l, q.visual!.kind === "bars" ? q.visual!.values[i] : 0]));
+    if (q.prompt.endsWith("Hur många bilar är det tillsammans?")) return A === v["Röd"] + v["Blå"] + v["Gul"];
+    const f = q.prompt.match(/Hur många fler är (\S+) än (\S+)\?$/);
+    const key: Record<string, string> = { röda: "Röd", blå: "Blå", gula: "Gul" };
+    return !!f && A === v[key[f[1]]] - v[key[f[2]]] && A > 0;
+  }
   // Platsvärde, huvudräkning, mönster, former, klockan, data och logik.
   m = q.prompt.match(/^Vilket tal är (\d) tiotal och (\d) ental\?$/);
   if (m) return A === +m[1] * 10 + +m[2];
@@ -230,6 +244,16 @@ describe("frågemallar för matte", () => {
           if (ok !== null) { expect(ok, `${t.id} ${rep}: ${q.prompt} = ${q.answer}`).toBe(true); checked++; }
         }
         expect(checked).toBeGreaterThan(0);
+      });
+
+      it("bildfrågor har en bild, andra frågor har ingen", () => {
+        const rng = seededRng(11);
+        for (const rep of t.representations) for (let i = 0; i < 100; i++) {
+          const q = t.generate(rng, i / 100, rep);
+          if (!/klockan|tabeller/.test(t.skillId)) continue;
+          if (rep === "visual") expect(q.visual, q.prompt).toBeDefined();
+          else expect(q.visual, q.prompt).toBeUndefined();
+        }
       });
 
       it("svarsalternativen är unika och rätt svar finns exakt en gång (AT-09)", () => {

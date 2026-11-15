@@ -283,7 +283,7 @@ const ALL: Representation[] = ["symbol", "missing", "choice", "visual", "story"]
 const EXTRA_REPS: Representation[] = ["symbol", "choice", "story"];
 
 /** Det en procedurmall ger för givna tal: texten, facit, vanliga fel och ledtrådarna. */
-interface Made { prompt: string; answer: number; near: number[]; hints: [string, string, string]; storyFact?: Fact }
+interface Made { prompt: string; answer: number; near: number[]; hints: [string, string, string]; storyFact?: Fact; visual?: Question["visual"] }
 
 /**
  * Gemensam byggare. `choose` väljer talen (och är den enda som använder slump), `build` räknar ut allt
@@ -295,13 +295,16 @@ function procTemplate(
   build: (p: Record<string, number>) => Made,
   keys?: Template["keys"],
 ): Template {
+  const hasVisual = representations.includes("visual");
   return {
     id, version: 1, skillId, representations, keys,
     generate(rng, d, rep) {
-      const params = choose(rng, d);
+      // Mallar med bildform får `vis` bland talen, så att ledtrådarna byggs om på samma sätt senare.
+      const params = hasVisual ? { ...choose(rng, d), vis: rep === "visual" ? 1 : 0 } : choose(rng, d);
       const m = build(params);
       const base = { templateId: id, templateVersion: 1, skillId, representation: rep, params, difficulty: d, answer: m.answer };
       if (rep === "choice") return { ...base, prompt: m.prompt, input: "choice", choices: distractors(rng, m.answer, m.near, keys === "neg" || keys === "both") };
+      if (rep === "visual" && m.visual) return { ...base, prompt: m.prompt, input: "number", visual: m.visual };
       if (rep === "story" && m.storyFact) return { ...base, prompt: story(rng, m.storyFact), input: "number" };
       return { ...base, prompt: m.prompt, input: "number" };
     },
@@ -1201,9 +1204,22 @@ function scaleTemplate(): Template {
 
 /** Klockan: hela och halva timmar. */
 function clockHalfTemplate(): Template {
-  return procTemplate("ma.mat.klockan_hel.v1", "ma.mat.klockan_hel", REPS2,
-    (rng, d) => ({ form: int(rng, 0, 1), h: int(rng, 1, 11), n: int(rng, 1, 2 + Math.round(d * 4)) }),
-    ({ form, h, n }) => {
+  const reps: Representation[] = [...REPS2, "visual"];
+  return procTemplate("ma.mat.klockan_hel.v1", "ma.mat.klockan_hel", reps,
+    (rng, d) => ({ form: int(rng, 0, 1), h: int(rng, 1, 11), n: int(rng, 1, 2 + Math.round(d * 4)), half: int(rng, 0, 1) }),
+    ({ form, h, n, half, vis }) => {
+      if (vis === 1) {
+        // Klockan på bild: hel timme, eller halv (halv fyra är 3:30).
+        if (half === 1) {
+          const shown = h, after = (h % 12) + 1;
+          return { prompt: "Klockan visar halv. Vilket tal kommer efter «halv»? Skriv timmen.", answer: after, near: [shown, after + 1, after - 1 > 0 ? after - 1 : 12, 6],
+            visual: { kind: "clock", h: shown, m: 30 },
+            hints: ["Halv betyder en halvtimme före nästa hela timme. Den långa visaren pekar nedåt.", "Titta på den korta visaren. Den står mellan två timmar. Vilket tal är det nästa?", `Den korta visaren har passerat ${h} och pekar mot ${after}, så klockan är halv ${after}. Svaret är ${after}.`] };
+        }
+        return { prompt: "Klockan visar en hel timme. Vilken timme är det? Skriv timmen.", answer: h, near: [h + 1, h - 1 > 0 ? h - 1 : 12, 12, 6],
+          visual: { kind: "clock", h, m: 0 },
+          hints: ["När den långa visaren pekar rakt upp är det en hel timme.", "Den korta visaren visar timmen. Läs av vilket tal den pekar på.", `Den korta visaren pekar på ${h}. Svaret är ${h}.`] };
+      }
       if (form === 1) return { prompt: `Hur många halvtimmar är det på ${n} ${n === 1 ? "timme" : "timmar"}?`, answer: 2 * n, near: [n, n + 2, 2 * n + 1, 2 * n - 1],
         hints: ["En halvtimme är hälften av en timme.", "Det går två halvtimmar på en timme.", `${n} × 2 = ${2 * n}. Svaret är ${2 * n}.`] };
       const ans = ((h + n - 1) % 12) + 1;
@@ -1214,9 +1230,19 @@ function clockHalfTemplate(): Template {
 
 /** Klockan på minuten: tid kvar till hel timme, och minuter som går. */
 function clockMinuteTemplate(): Template {
-  return procTemplate("ma.mat.klockan_minut.v1", "ma.mat.klockan_minut", REPS2,
+  const reps: Representation[] = [...REPS2, "visual"];
+  return procTemplate("ma.mat.klockan_minut.v1", "ma.mat.klockan_minut", reps,
     (rng, d) => ({ form: int(rng, 0, 1), h: int(rng, 1, 12), m: int(rng, 5, 55), p: int(rng, 5, 30 + Math.round(d * 25)) }),
-    ({ form, h, m, p }) => {
+    ({ form, h, m, p, vis }) => {
+      if (vis === 1) {
+        // Visarna på bild. Minuterna är alltid jämna femtal så att de går att läsa av.
+        const mm = Math.round(m / 5) * 5 % 60 || 5;
+        const visual = { kind: "clock" as const, h, m: mm };
+        if (form === 1) return { prompt: "Hur många minuter är det kvar till nästa hela timme?", answer: 60 - mm, near: [mm, 100 - mm, 60 - mm + 5, 60 - mm - 5 > 0 ? 60 - mm - 5 : 10], visual,
+          hints: ["En hel timme är 60 minuter. Den långa visaren går ett varv på en timme.", "Läs av hur många minuter den långa visaren har gått. Ta sedan resten av varvet.", `Visaren har gått ${mm} minuter och 60 − ${mm} = ${60 - mm}. Svaret är ${60 - mm}.`] };
+        return { prompt: "Hur många minuter efter hel timme visar klockan?", answer: mm, near: [60 - mm, mm + 5, mm - 5 > 0 ? mm - 5 : 10, mm / 5], visual,
+          hints: ["Den långa visaren visar minuterna. Varje tal på klockan är fem minuter.", "Titta var den långa visaren pekar. Räkna fem för varje tal från 12.", `Den pekar på ${mm / 5}, och ${mm / 5} × 5 = ${mm}. Svaret är ${mm}.`] };
+      }
       if (form === 1) {
         const ans = (m + p) % 60;
         return { prompt: `Klockan är ${h}:${two(m)}. Efter ${p} minuter, vilka minuter visar klockan? Skriv bara minutdelen.`, answer: ans, near: [m + p, p, m, ans + 5, ans - 5 < 0 ? ans + 10 : ans - 5],
@@ -1233,19 +1259,22 @@ const PLURAL = ["röda", "blå", "gula"] as const;
 
 /** Läsa tabeller: skillnad, summa och största minus minsta. */
 function tableTemplate(): Template {
-  return procTemplate("ma.stat.tabeller.v1", "ma.stat.tabeller", REPS2,
+  const reps: Representation[] = [...REPS2, "visual"];
+  return procTemplate("ma.stat.tabeller.v1", "ma.stat.tabeller", reps,
     (rng, d) => {
       const hi = 8 + Math.round(d * 40);
       const v = shuffle(rng, [int(rng, 2, hi), int(rng, 2, hi), int(rng, 2, hi)]);
-      if (v[0] === v[1]) v[1]++; if (v[1] === v[2] || v[0] === v[2]) v[2] += 2;
+      while (v[1] === v[0]) v[1]++;
+      while (v[2] === v[0] || v[2] === v[1]) v[2]++;
       return { form: int(rng, 0, 1), a: v[0], b: v[1], c: v[2], p: int(rng, 0, 2), q: int(rng, 1, 2) };
     },
-    ({ form, a, b, c, p, q }) => {
-      const v = [a, b, c], head = `Tabellen visar antal bilar: ${COLORS[0]} ${a}, ${COLORS[1]} ${b}, ${COLORS[2]} ${c}.`;
-      if (form === 1) { const ans = a + b + c; return { prompt: `${head} Hur många bilar är det tillsammans?`, answer: ans, near: [a + b, b + c, a + c, ans + 1, ans - 1],
+    ({ form, a, b, c, p, q, vis }) => {
+      const v = [a, b, c], head = vis === 1 ? "Diagrammet visar antal bilar." : `Tabellen visar antal bilar: ${COLORS[0]} ${a}, ${COLORS[1]} ${b}, ${COLORS[2]} ${c}.`;
+      const visual = vis === 1 ? { kind: "bars" as const, labels: [...COLORS], values: [a, b, c] } : undefined;
+      if (form === 1) { const ans = a + b + c; return { visual, prompt: `${head} Hur många bilar är det tillsammans?`, answer: ans, near: [a + b, b + c, a + c, ans + 1, ans - 1],
         hints: ["Tillsammans betyder att allt ska läggas ihop.", "Läs av alla tre siffror och lägg ihop dem.", `${a} + ${b} + ${c} = ${ans}. Svaret är ${ans}.`] }; }
       const x = p, y = (p + q) % 3, hi = v[x] > v[y] ? x : y, lo = hi === x ? y : x, ans = v[hi] - v[lo];
-      return { prompt: `${head} Hur många fler är ${PLURAL[hi]} än ${PLURAL[lo]}?`, answer: ans, near: [v[hi] + v[lo], v[hi], v[lo], ans + 1, ans - 1],
+      return { visual, prompt: `${head} Hur många fler är ${PLURAL[hi]} än ${PLURAL[lo]}?`, answer: ans, near: [v[hi] + v[lo], v[hi], v[lo], ans + 1, ans - 1],
         hints: ["Hur många fler är en skillnad. Det är minus.", `Läs av ${PLURAL[hi]} och ${PLURAL[lo]} bilar i tabellen. Ta det större minus det mindre.`, `${v[hi]} − ${v[lo]} = ${ans}. Svaret är ${ans}.`] };
     });
 }

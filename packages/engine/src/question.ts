@@ -9,7 +9,11 @@ export type Visual =
   /** Prickar att räkna. "frame" ligger i en tioruta, "scatter" ligger utspridda (positionerna kommer från seed). */
   | { kind: "count"; n: number; layout: "frame" | "scatter"; seed: number }
   /** En bit av tallinjen. Talet på platsen `hidden` visas som ett frågetecken. */
-  | { kind: "numberline"; from: number; to: number; hidden: number };
+  | { kind: "numberline"; from: number; to: number; hidden: number }
+  /** En analog klocka. m är 0–59; timvisaren står där den ska för klockslaget. */
+  | { kind: "clock"; h: number; m: number }
+  /** Ett stapeldiagram: en stapel per etikett. */
+  | { kind: "bars"; labels: string[]; values: number[] };
 
 export interface Question {
   templateId: string;

@@ -6,6 +6,8 @@ export function QuestionVisual({ visual }: { visual: Visual }) {
   if (visual.kind === "groups") return <Groups groups={visual.groups} per={visual.per} />;
   if (visual.kind === "count") return <Count n={visual.n} layout={visual.layout} seed={visual.seed} />;
   if (visual.kind === "numberline") return <NumberLine from={visual.from} to={visual.to} hidden={visual.hidden} />;
+  if (visual.kind === "clock") return <Clock h={visual.h} m={visual.m} />;
+  if (visual.kind === "bars") return <Bars labels={visual.labels} values={visual.values} />;
   return <Share total={visual.total} groups={visual.groups} />;
 }
 
@@ -133,6 +135,56 @@ function NumberLine({ from, to, hidden }: { from: number; to: number; hidden: nu
           </g>
         );
       })}
+    </svg>
+  );
+}
+
+/** En analog klocka med tolv tal. Den korta visaren följer minuterna, som på en riktig klocka. */
+function Clock({ h, m }: { h: number; m: number }) {
+  const hourDeg = ((h % 12) + m / 60) * 30, minDeg = m * 6;
+  const hand = (deg: number, len: number, w: number, color: string) => {
+    const a = (deg * Math.PI) / 180;
+    return <path d={`M100 100 L${100 + Math.sin(a) * len} ${100 - Math.cos(a) * len}`} stroke={color} strokeWidth={w} strokeLinecap="round" />;
+  };
+  return (
+    <svg viewBox="0 0 200 200" className="mx-auto w-full max-w-[220px]" role="img" aria-label="En analog klocka">
+      <circle cx="100" cy="100" r="92" fill="#fff" stroke="var(--plommon)" strokeWidth="5" />
+      {Array.from({ length: 60 }, (_, i) => {
+        const a = (i * 6 * Math.PI) / 180, big = i % 5 === 0;
+        const r1 = big ? 78 : 85, r2 = 90;
+        return <path key={i} d={`M${100 + Math.sin(a) * r1} ${100 - Math.cos(a) * r1} L${100 + Math.sin(a) * r2} ${100 - Math.cos(a) * r2}`} stroke="var(--dimma)" strokeWidth={big ? 3 : 1.5} strokeLinecap="round" />;
+      })}
+      {Array.from({ length: 12 }, (_, i) => {
+        const n = i + 1, a = (n * 30 * Math.PI) / 180;
+        return <text key={n} x={100 + Math.sin(a) * 60} y={100 - Math.cos(a) * 60 + 7} textAnchor="middle" style={{ fontFamily: "var(--font-display)", fontSize: 20 }} fill="var(--plommon)">{n}</text>;
+      })}
+      {hand(hourDeg, 44, 7, "var(--plommon)")}
+      {hand(minDeg, 76, 3.5, "var(--jordgubb)")}
+      <circle cx="100" cy="100" r="6" fill="var(--plommon)" />
+    </svg>
+  );
+}
+
+/** Stapeldiagram med tal på y-axeln och en stapel per etikett. */
+function Bars({ labels, values }: { labels: string[]; values: number[] }) {
+  const max = Math.max(...values), top = Math.ceil(max / 5) * 5, w = 320, h = 190, left = 34, bottom = 150, slot = (w - left - 10) / labels.length;
+  const colors = ["var(--jordgubb)", "var(--himmel)", "var(--citron)"];
+  const y = (v: number) => bottom - (v / top) * (bottom - 30);
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="mx-auto w-full max-w-md" role="img" aria-label={`Stapeldiagram: ${labels.map((l, i) => `${l} ${values[i]}`).join(", ")}`}>
+      {Array.from({ length: top / 5 + 1 }, (_, i) => i * 5).map((t) => (
+        <g key={t}>
+          <path d={`M${left} ${y(t)} H${w - 6}`} stroke="var(--dimma)" strokeWidth={t === 0 ? 2.5 : 1} opacity={t === 0 ? 1 : 0.4} />
+          {(t % 10 === 0 || top <= 20) && <text x={left - 6} y={y(t) + 5} textAnchor="end" style={{ fontSize: 12 }} fill="var(--plommon)">{t}</text>}
+        </g>
+      ))}
+      {values.map((v, i) => (
+        <g key={i}>
+          <text x={left + i * slot + slot / 2} y={y(v) - 6} textAnchor="middle" style={{ fontFamily: "var(--font-display)", fontSize: 15 }} fill="var(--plommon)">{v}</text>
+          <rect x={left + i * slot + slot * 0.2} y={y(v)} width={slot * 0.6} height={bottom - y(v)} rx="6" fill={colors[i % colors.length]} stroke="var(--plommon)" strokeWidth="2" />
+          <text x={left + i * slot + slot / 2} y={bottom + 22} textAnchor="middle" style={{ fontFamily: "var(--font-display)", fontSize: 16 }} fill="var(--plommon)">{labels[i]}</text>
+        </g>
+      ))}
     </svg>
   );
 }

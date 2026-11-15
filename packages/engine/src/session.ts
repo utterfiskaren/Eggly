@@ -129,7 +129,9 @@ function toBeta(d: number): number {
 /** Frågetyp: den som använts minst i passet, med visuellt stöd vid återhämtning och i Mysigt. */
 function chooseRepresentation(t: Template, session: SessionState, reason: Reason, rng: () => number, allowed?: Representation[]): Representation {
   const ok = allowed ? t.representations.filter((r) => allowed.includes(r)) : [];
-  const reps = ok.length ? ok : t.representations;
+  const base = ok.length ? ok : t.representations;
+  // Spel som inte kan rita bilder (de som inte tillåter «visual») får aldrig en bildfråga.
+  const reps = allowed && !allowed.includes("visual") && base.some((r) => r !== "visual") ? base.filter((r) => r !== "visual") : base;
   if ((reason === "scaffold_recovery" || session.mode === "mysigt") && reps.includes("visual")) return "visual";
   if (session.mode === "klurigt") {
     const harder = reps.filter((r) => r === "story" || r === "missing");

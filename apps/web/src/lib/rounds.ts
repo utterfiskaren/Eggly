@@ -36,7 +36,7 @@ export const playedAs = (g: GameId): GameId => (BUILT.includes(g) ? g : STAND_IN
 
 const GAME_CFG: Record<GameId, { reps?: Representation[]; n: number }> = {
   rakna: { reps: ["symbol", "missing", "story", "visual"], n: 10 },
-  bubbel: { n: 10 }, sant: { n: 12 }, fanga: { n: 10 }, storre: { reps: ["symbol"], n: 10 }, krossa: { n: 8 },
+  bubbel: { n: 10 }, sant: { n: 12 }, fanga: { reps: ["symbol", "missing", "story", "choice"], n: 10 }, storre: { reps: ["symbol"], n: 10 }, krossa: { n: 8 },
   minne: { reps: ["symbol"], n: 6 }, kiosk: { reps: ["symbol", "story"], n: 6 },
   // Spurten och Striden behöver många uppgifter i reserv: hur många som går åt beror på barnet.
   spurt: { reps: ["symbol", "missing"], n: 60 }, strid: { reps: ["symbol", "missing"], n: 40 },
