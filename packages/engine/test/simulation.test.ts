@@ -16,7 +16,7 @@ import { newSession, nextQuestion, recordAnswer, seededRng, type ChildModel, typ
 const SKILLS = [
   "ma.add.inom10", "ma.sub.inom10", "ma.tal.tiokamrater", "ma.add.inom20_utan", "ma.add.inom20_med",
   "ma.sub.inom20_utan", "ma.sub.inom20_med", "ma.samb.dubbelt_halften", "ma.mul.grupper", "ma.mul.tabell_2_5_10",
-  "ma.mul.tabell_3_4", "ma.div.likadelning", "ma.alg.saknat_tal", "ma.tal.jamfora",
+  "ma.mul.tabell_3_4", "ma.div.likadelning", "ma.alg.saknat_tal", "ma.tal.jamfora", "ma.tal.antal10", "ma.tal.ordning20",
 ];
 const STUDENTS = 10_000;
 const SESSIONS = 5;
@@ -88,8 +88,10 @@ describe("simulering med 10 000 elever", () => {
       expect(r.streak4).toBeLessThan(0.05);
       expect(r.meanP).toBeGreaterThan(0.65);
       expect(r.meanP).toBeLessThan(0.92);
-      // Även svaga elever klarar de flesta uppgifterna. Gränsen höjs till 0,65 när mallarna för
-      // antal och talens ordning finns (innehållets golv, se "floor").
+      // Även svaga elever klarar de flesta uppgifterna. Simuleringen ger varje färdighet samma skala,
+      // så mallarna för antal och ordning (2026-11-15) flyttar inte måttet: i simuleringen är de inte
+      // lättare än plus. Hos riktiga barn är de det, och kartan låter barnet börja vid ett tidigare stopp.
+      // Gränsen ligger kvar på 0,55 tills simuleringen har en egen svårighet per färdighet.
       expect(r.weak).toBeGreaterThan(0.55);
       expect(r.strong).toBeLessThan(0.95);   // och starka får fortfarande utmaning
     }, 120_000);

@@ -2,6 +2,8 @@
 
 import { supabaseServer } from "@/lib/supabase/server";
 import { answerQuestion, startSession, takeHint, type AnswerResult, type ClientQuestion } from "@/lib/play";
+import { hatch } from "@/lib/world";
+import { revalidatePath } from "next/cache";
 import type { Mode } from "@eggly/engine";
 
 /** Barnets id hämtas alltid från den verifierade inloggningen. */
@@ -16,8 +18,16 @@ async function childId(): Promise<string> {
 
 const MODES: Mode[] = ["mysigt", "aventyr", "klurigt"];
 
-export async function startMatte(mode: Mode): Promise<ClientQuestion> {
-  return startSession(await childId(), MODES.includes(mode) ? mode : "aventyr");
+export async function startMatte(mode: Mode, stopId: string): Promise<ClientQuestion> {
+  return startSession(await childId(), MODES.includes(mode) ? mode : "aventyr", String(stopId).slice(0, 40));
+}
+
+/** Kläcker ett ägg. Ger klämmisens id, eller null om inget ägg fanns. */
+export async function klackAgg(): Promise<string | null> {
+  const s = await hatch(await childId());
+  revalidatePath("/spela/samling");
+  revalidatePath("/spela/matte");
+  return s?.id ?? null;
 }
 
 export async function svara(sessionId: string, answer: string): Promise<AnswerResult | null> {

@@ -4,6 +4,8 @@ import type { Visual } from "@eggly/engine";
 export function QuestionVisual({ visual }: { visual: Visual }) {
   if (visual.kind === "tenframe") return <TenFrames a={visual.a} b={visual.b} op={visual.op} />;
   if (visual.kind === "groups") return <Groups groups={visual.groups} per={visual.per} />;
+  if (visual.kind === "count") return <Count n={visual.n} layout={visual.layout} seed={visual.seed} />;
+  if (visual.kind === "numberline") return <NumberLine from={visual.from} to={visual.to} hidden={visual.hidden} />;
   return <Share total={visual.total} groups={visual.groups} />;
 }
 
@@ -76,6 +78,61 @@ function Share({ total, groups }: { total: number; groups: number }) {
       {Array.from({ length: groups }, (_, g) => (
         <ellipse key={g} cx={(w / (groups + 1)) * (g + 1)} cy={rows * 22 + 40} rx="20" ry="10" fill="#fff" stroke="var(--dimma)" strokeWidth="2.5" />
       ))}
+    </svg>
+  );
+}
+
+/**
+ * Prickar att räkna. Etiketten säger inte hur många: då vore svaret givet för den som använder skärmläsare.
+ * Utspridda prickar får sina platser från uppgiftens seed, så samma uppgift ser alltid likadan ut.
+ */
+function Count({ n, layout, seed }: { n: number; layout: "frame" | "scatter"; seed: number }) {
+  if (layout === "frame") {
+    const w = 5 * CELL + 8, h = 2 * CELL + 8;
+    return (
+      <svg viewBox={`0 0 ${w} ${h}`} className="mx-auto w-full max-w-[16rem]" role="img" aria-label="Prickar i en tioruta att räkna">
+        <rect x="1" y="1" width={w - 2} height={h - 2} rx="10" fill="#fff" stroke="var(--dimma)" strokeWidth="2" />
+        {Array.from({ length: 10 }, (_, i) => {
+          const cx = 4 + (i % 5) * CELL + CELL / 2, cy = 4 + Math.floor(i / 5) * CELL + CELL / 2;
+          return i < n
+            ? <circle key={i} cx={cx} cy={cy} r={DOT / 2} fill="var(--jordgubb)" />
+            : <circle key={i} cx={cx} cy={cy} r={DOT / 2} fill="none" stroke="var(--dimma)" strokeWidth="2" />;
+        })}
+      </svg>
+    );
+  }
+  let x = seed >>> 0 || 1;
+  const rnd = () => { x ^= x << 13; x ^= x >>> 17; x ^= x << 5; return ((x >>> 0) % 10000) / 10000; };
+  const pts: [number, number][] = [];
+  for (let tries = 0; pts.length < n && tries < 2000; tries++) {
+    const p: [number, number] = [20 + rnd() * 200, 20 + rnd() * 90];
+    if (pts.every(([a, b]) => (a - p[0]) ** 2 + (b - p[1]) ** 2 > 30 * 30)) pts.push(p);
+  }
+  return (
+    <svg viewBox="0 0 240 130" className="mx-auto w-full max-w-xs" role="img" aria-label="Utspridda prickar att räkna">
+      <rect x="1" y="1" width="238" height="128" rx="16" fill="#fff" stroke="var(--dimma)" strokeWidth="2" />
+      {pts.map(([cx, cy], i) => <circle key={i} cx={cx} cy={cy} r="11" fill="var(--jordgubb)" />)}
+    </svg>
+  );
+}
+
+/** En bit av tallinjen med ett frågetecken där svaret ska stå. */
+function NumberLine({ from, to, hidden }: { from: number; to: number; hidden: number }) {
+  const steps = to - from, w = 320, pad = 22, step = (w - 2 * pad) / steps;
+  return (
+    <svg viewBox={`0 0 ${w} 70`} className="mx-auto w-full max-w-md" role="img" aria-label={`Tallinje från ${from} till ${to}. Ett tal saknas.`}>
+      <path d={`M${pad - 10} 24 H${w - pad + 10}`} stroke="var(--plommon)" strokeWidth="3" strokeLinecap="round" />
+      {Array.from({ length: steps + 1 }, (_, i) => {
+        const v = from + i, cx = pad + i * step;
+        const gone = v === hidden;
+        return (
+          <g key={i}>
+            <path d={`M${cx} 16 V32`} stroke="var(--plommon)" strokeWidth="3" strokeLinecap="round" />
+            {gone && <rect x={cx - 14} y="38" width="28" height="26" rx="8" fill="var(--citron)" />}
+            <text x={cx} y="58" textAnchor="middle" style={{ fontFamily: "var(--font-display)", fontSize: 18 }} fill="var(--plommon)">{gone ? "?" : v}</text>
+          </g>
+        );
+      })}
     </svg>
   );
 }

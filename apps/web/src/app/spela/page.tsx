@@ -18,11 +18,13 @@ export default async function Page() {
   const supabase = await supabaseServer();
   const { data: claims } = await supabase.auth.getClaims();
   const me = claims?.claims?.sub;
-  const [{ data: profile }, { data: classes }, { data: invites }] = await Promise.all([
+  const [{ data: profile }, { data: classes }, { data: invites }, { data: asked }] = await Promise.all([
     supabase.from("profiles").select("alias").eq("id", me).single(),
     supabase.from("classes").select("id, name"),
     supabase.from("join_requests").select("id, classes(name)").eq("child_id", me)
       .eq("direction", "teacher_invites").eq("status", "pending"),
+    supabase.from("join_requests").select("id").eq("child_id", me)
+      .eq("direction", "child_asks").eq("status", "pending"),
   ]);
 
   return (
@@ -31,7 +33,10 @@ export default async function Page() {
         <Logo size={34} />
         <form action={signOut}><button className="squish squish--liten squish--mjuk">Logga ut</button></form>
       </header>
-      <h1 style={{ fontSize: "var(--t-2xl)" }}>Hej {profile?.alias ?? "där"}!</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 style={{ fontSize: "var(--t-2xl)" }}>Hej {profile?.alias ?? "där"}!</h1>
+        <Link href="/spela/samling" className="squish squish--liten squish--mjuk">Min samling</Link>
+      </div>
 
       <section aria-labelledby="oar" className="flex flex-col gap-3">
         <h2 id="oar" style={{ fontSize: "var(--t-xl)" }}>Välj en ö</h2>
@@ -74,6 +79,11 @@ export default async function Page() {
           {classes && classes.length > 0
             ? <p className="mb-3">Du är med i: <strong>{classes.map((c) => c.name).join(", ")}</strong></p>
             : null}
+          {asked && asked.length > 0 && (
+            <p className="mb-3 font-semibold text-[var(--mynta)]" role="status">
+              Du har bett om att få gå med i en klass. Nu väntar vi på att läraren säger ja.
+            </p>
+          )}
           <JoinClassForm />
         </section>
         <section className="kort p-5" aria-label="Kod för vuxen"><ShowCodeForAdult /></section>

@@ -15,7 +15,7 @@ const MODES: { id: Mode; name: string; text: string }[] = [
 
 type Feedback = { kind: "ok" | "again" | "info"; text: string } | null;
 
-export function MatteGame() {
+export function MatteGame({ stop }: { stop: { id: string; name: string } }) {
   const [q, setQ] = useState<ClientQuestion | null>(null);
   const [summary, setSummary] = useState<SessionSummary | null>(null);
   const [answer, setAnswer] = useState("");
@@ -27,8 +27,22 @@ export function MatteGame() {
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
+  const nextRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => { if (q && !queued) inputRef.current?.focus({ preventScroll: true }); }, [q, queued]);
+  useEffect(() => { if (queued) nextRef.current?.focus({ preventScroll: true }); }, [queued]);
+
+  // Enter går vidare till nästa uppgift, var fokus än ligger. Tangenten som skickade svaret räknas inte.
+  useEffect(() => {
+    if (!queued) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Enter" || e.repeat) return;
+      e.preventDefault();
+      nextRef.current?.click();
+    };
+    const t = window.setTimeout(() => window.addEventListener("keydown", onKey), 150);
+    return () => { window.clearTimeout(t); window.removeEventListener("keydown", onKey); };
+  }, [queued]);
 
   function reset(next: ClientQuestion) {
     setQ(next); setAnswer(""); setHints(next.hints); setHintLevel(next.hintLevel); setTries(0); setFeedback(null); setQueued(null);
@@ -44,7 +58,7 @@ export function MatteGame() {
 
   function begin(mode: Mode) {
     setSummary(null);
-    run(() => startMatte(mode), reset);
+    run(() => startMatte(mode, stop.id), reset);
   }
 
   function handleResult(r: AnswerResult | null) {
@@ -85,7 +99,7 @@ export function MatteGame() {
   if (!q && !summary) {
     return (
       <section aria-labelledby="valj" className="flex flex-col gap-4">
-        <h1 id="valj" style={{ fontSize: "var(--t-2xl)" }}>Hur vill du spela idag?</h1>
+        <h1 id="valj" style={{ fontSize: "var(--t-2xl)" }}>{stop.name}: hur vill du spela?</h1>
         <p className="text-[var(--plommon-2)]">Du får lika många stjärnor i alla lägen.</p>
         <div className="grid gap-4 sm:grid-cols-3">
           {MODES.map((m) => (
@@ -112,9 +126,20 @@ export function MatteGame() {
         <ul className="flex flex-col gap-1">
           {summary.skills.map((s) => <li key={s.title}>{s.title}: {s.correct} av {s.total}</li>)}
         </ul>
+        {summary.stop && (
+          <div className="flex flex-col items-center gap-1">
+            <p aria-label={`${summary.stop.stars} av 3 stjärnor på ${summary.stop.name}`} className="text-2xl tracking-widest">
+              <span aria-hidden="true">{"★".repeat(summary.stop.stars)}<span className="opacity-25">{"★".repeat(3 - summary.stop.stars)}</span></span>
+            </p>
+            {summary.stop.opened && <p className="font-semibold text-[var(--mynta)]">Nytt stopp öppnat: {summary.stop.opened}!</p>}
+            {summary.stop.eggs > 0 && <p className="font-semibold">Du har {summary.stop.eggs === 1 ? "ett ägg" : `${summary.stop.eggs} ägg`} att kläcka!</p>}
+          </div>
+        )}
         <div className="flex flex-wrap justify-center gap-3">
-          <button className="squish" onClick={() => setSummary(null)}>Spela igen</button>
-          <Link href="/spela" className="squish squish--mjuk">Tillbaka till öarna</Link>
+          {summary.stop && summary.stop.eggs > 0
+            ? <Link href="/spela/samling" className="squish">Kläck ägget</Link>
+            : <button className="squish" onClick={() => setSummary(null)}>Spela igen</button>}
+          <Link href="/spela/matte" className="squish squish--mjuk">Tillbaka till kartan</Link>
         </div>
       </section>
     );
@@ -131,7 +156,7 @@ export function MatteGame() {
               background: i < question.index || (i === question.index && queued) ? "var(--mynta)" : i === question.index ? "var(--citron)" : "var(--dimma)" }} />
           ))}
         </ol>
-        <Link href="/spela" className="lank text-sm">Avsluta</Link>
+        <Link href="/spela/matte" className="lank text-sm">Avsluta</Link>
       </div>
 
       <div className="kort flex flex-col gap-4 p-5">
@@ -180,7 +205,7 @@ export function MatteGame() {
         )}
 
         {queued ? (
-          <button className="squish" onClick={next} autoFocus>{queued.summary ? "Se vad du klarade" : "Nästa"}</button>
+          <button ref={nextRef} className="squish" onClick={next}>{queued.summary ? "Se vad du klarade" : "Nästa"}</button>
         ) : (
           <div className="flex flex-wrap justify-center gap-3">
             <button className="squish squish--mjuk squish--liten" onClick={hint} disabled={pending || hintLevel >= 2}>

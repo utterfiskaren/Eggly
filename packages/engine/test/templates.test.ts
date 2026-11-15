@@ -19,6 +19,18 @@ function checkByPrompt(q: Question): boolean | null {
   m = q.prompt.match(/^Hälften av (\d+) = \?$/);
   if (m) return +m[1] / 2 === q.answer;
   if (q.prompt === "Vilket tal är störst?") return q.answer === Math.max(...q.choices!);
+  if (q.prompt === "Hur många prickar?") return q.visual?.kind === "count" && q.visual.n === q.answer;
+  m = q.prompt.match(/^Vilket tal kommer (efter|före) (\d+)\?$/);
+  if (m) return q.answer === +m[2] + (m[1] === "efter" ? 1 : -1);
+  m = q.prompt.match(/^Vilket tal ligger mellan (\d+) och (\d+)\?$/);
+  if (m) return q.answer === (+m[1] + +m[2]) / 2 && +m[2] - +m[1] === 2;
+  m = q.prompt.match(/^Vilket tal saknas\? (.+)$/);
+  if (m) {
+    const parts = m[1].split(", ");
+    const i = parts.indexOf("?");
+    const known = parts.map((x, j) => (x === "?" ? null : +x - j)).filter((x) => x !== null);
+    return new Set(known).size === 1 && q.answer === known[0]! + i;
+  }
   return null; // berättelser: kontrolleras via parametrarna nedan
 }
 

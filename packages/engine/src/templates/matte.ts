@@ -7,9 +7,14 @@ import { int, pick, shuffle } from "../rng";
  */
 
 const NAMES = ["Mochi", "Pudding", "Bubbel", "Kanelbulle", "Dimma", "Plopp", "Tuss", "Mango"] as const;
+/** [en, flera]. Rätt böjning: «1 knapp», «2 knappar». */
 const THINGS = [
-  ["bär", "bär"], ["kulor", "kulor"], ["stjärnor", "stjärnor"], ["ägg", "ägg"], ["knappar", "knappar"],
+  ["bär", "bär"], ["kula", "kulor"], ["stjärna", "stjärnor"], ["ägg", "ägg"], ["knapp", "knappar"],
 ] as const;
+
+function count(n: number, thing: readonly [string, string]): string {
+  return `${n} ${n === 1 ? thing[0] : thing[1]}`;
+}
 
 type Op = "+" | "−" | "×" | "÷";
 
@@ -55,12 +60,13 @@ function nearMisses(f: Fact): number[] {
 
 function story(rng: () => number, f: Fact): string {
   const name = pick(rng, NAMES);
-  const [thing] = pick(rng, THINGS);
+  const thing = pick(rng, THINGS);
+  const many = thing[1];
   switch (f.op) {
-    case "+": return `${name} har ${f.a} ${thing} och hittar ${f.b} till. Hur många ${thing} har ${name} nu?`;
-    case "−": return `${name} har ${f.a} ${thing} och ger bort ${f.b}. Hur många ${thing} har ${name} kvar?`;
-    case "×": return `${f.a} klämmisar har ${f.b} ${thing} var. Hur många ${thing} är det tillsammans?`;
-    case "÷": return `${name} delar ${f.a} ${thing} lika mellan ${f.b} kompisar. Hur många får var och en?`;
+    case "+": return `${name} har ${count(f.a, thing)} och hittar ${f.b} till. Hur många ${many} har ${name} nu?`;
+    case "−": return `${name} har ${count(f.a, thing)} och ger bort ${f.b}. Hur många ${many} har ${name} kvar?`;
+    case "×": return `${f.a} ${f.a === 1 ? "klämmis" : "klämmisar"} har ${count(f.b, thing)} var. Hur många ${many} är det tillsammans?`;
+    case "÷": return `${name} delar ${count(f.a, thing)} lika mellan ${f.b} ${f.b === 1 ? "kompis" : "kompisar"}. Hur många får var och en?`;
   }
 }
 
@@ -302,7 +308,76 @@ export const mathTemplates: Template[] = [
   twoDigitTemplate("−"),
   missingNumberTemplate(),
   compareTemplate(),
+  countTemplate(),
+  orderTemplate(),
 ];
+
+/** Räkna prickar upp till 10. Lätt: få prickar i en tioruta. Svårare: fler, och utspridda. */
+function countTemplate(): Template {
+  const id = "ma.tal.antal10.v1", skillId = "ma.tal.antal10";
+  return {
+    id, version: 1, skillId, representations: ["visual", "choice"],
+    generate(rng, d, rep) {
+      const n = Math.min(10, Math.max(1, int(rng, 1 + Math.round(d * 5), 4 + Math.round(d * 6))));
+      const layout: "frame" | "scatter" = d > 0.45 && rng() < 0.7 ? "scatter" : "frame";
+      const seed = int(rng, 1, 1_000_000);
+      const base = { templateId: id, templateVersion: 1, skillId, representation: rep, difficulty: d,
+        params: { n, scatter: layout === "scatter" ? 1 : 0, seed }, answer: n,
+        prompt: "Hur många prickar?", visual: { kind: "count", n, layout, seed } as Question["visual"] };
+      if (rep === "choice") return { ...base, input: "choice", choices: distractors(rng, n, [n + 1, n - 1, n + 2]) };
+      return { ...base, input: "number" };
+    },
+    hints(q) {
+      const scatter = q.params.scatter === 1;
+      return [
+        "Peka på en prick i taget och räkna högt.",
+        scatter ? "Räkna två i taget, och håll koll på vilka du redan räknat." : "Räkna den övre raden först och fortsätt sedan på den undre.",
+        `Det är ${q.answer} prickar.`,
+      ];
+    },
+  };
+}
+
+/** Talens ordning upp till 20: talet efter, talet före, talet mellan och talet som saknas i en följd. */
+function orderTemplate(): Template {
+  const id = "ma.tal.ordning20.v1", skillId = "ma.tal.ordning20";
+  const KINDS = ["after", "before", "between", "sequence"] as const;
+  return {
+    id, version: 1, skillId, representations: ["symbol", "choice", "visual"],
+    generate(rng, d, rep) {
+      const max = d < 0.4 ? 10 : 20;
+      const pool = d < 0.3 ? [0] : d < 0.6 ? [0, 1] : [1, 2, 3];
+      const k = KINDS[pick(rng, pool)];
+      const n = int(rng, 1, max - 1);
+      let prompt: string, answer: number;
+      if (k === "after") { prompt = `Vilket tal kommer efter ${n}?`; answer = n + 1; }
+      else if (k === "before") { prompt = `Vilket tal kommer före ${n}?`; answer = n - 1; }
+      else if (k === "between") { prompt = `Vilket tal ligger mellan ${n - 1} och ${n + 1}?`; answer = n; }
+      else {
+        const start = Math.max(0, Math.min(max - 4, n - 2));
+        const hole = start + int(rng, 1, 2);
+        const seq = [0, 1, 2, 3].map((i) => (start + i === hole ? "?" : String(start + i)));
+        prompt = `Vilket tal saknas? ${seq.join(", ")}`; answer = hole;
+      }
+      const from = Math.max(0, answer - 3), to = from + 6;
+      const base = { templateId: id, templateVersion: 1, skillId, representation: rep, difficulty: d,
+        params: { n, kind: KINDS.indexOf(k) }, prompt, answer };
+      if (rep === "choice") return { ...base, input: "choice", choices: distractors(rng, answer, [answer + 1, answer - 1, answer + 2]) };
+      if (rep === "visual") return { ...base, input: "number", visual: { kind: "numberline", from, to, hidden: answer } };
+      return { ...base, input: "number" };
+    },
+    hints(q) {
+      const k = KINDS[q.params.kind];
+      const first = k === "after" ? "Räkna uppåt ett steg." : k === "before" ? "Räkna bakåt ett steg."
+        : k === "between" ? "Talet i mitten är ett mer än det första talet." : "Talen ökar med ett i taget.";
+      return [
+        first,
+        k === "before" ? "På tallinjen ligger talet före ett steg till vänster." : "På tallinjen ligger nästa tal ett steg till höger.",
+        `Svaret är ${q.answer}.`,
+      ];
+    },
+  };
+}
 
 /** Addition och subtraktion med tvåsiffriga tal. Svårigheten styr storlek och om det blir växling. */
 function twoDigitTemplate(op: "+" | "−"): Template {

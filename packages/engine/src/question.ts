@@ -5,7 +5,11 @@ export type Representation = "symbol" | "missing" | "choice" | "visual" | "story
 export type Visual =
   | { kind: "tenframe"; a: number; b: number; op: "+" | "−" }
   | { kind: "groups"; groups: number; per: number }
-  | { kind: "share"; total: number; groups: number };
+  | { kind: "share"; total: number; groups: number }
+  /** Prickar att räkna. "frame" ligger i en tioruta, "scatter" ligger utspridda (positionerna kommer från seed). */
+  | { kind: "count"; n: number; layout: "frame" | "scatter"; seed: number }
+  /** En bit av tallinjen. Talet på platsen `hidden` visas som ett frågetecken. */
+  | { kind: "numberline"; from: number; to: number; hidden: number };
 
 export interface Question {
   templateId: string;

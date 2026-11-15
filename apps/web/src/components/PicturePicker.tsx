@@ -17,7 +17,8 @@ export function PicturePicker({ name = "pictures" }: { name?: string }) {
           return (
             <span key={i} className="flex h-14 w-14 items-center justify-center text-3xl"
               style={{ borderRadius: "var(--agg)", background: p ? "var(--vit)" : "var(--dimma)", border: "2px dashed var(--dimma)" }}>
-              {p ? <span aria-label={p.label}>{p.emoji}</span> : <span className="text-base text-[var(--plommon-2)]">{i + 1}</span>}
+              {p ? <span role="img" aria-label={`Bild ${i + 1}: ${p.label}`}>{p.emoji}</span>
+                : <span className="text-base text-[var(--plommon-2)]"><span aria-hidden="true">{i + 1}</span><span className="sr-only">Bild {i + 1}: inte vald än</span></span>}
             </span>
           );
         })}
@@ -27,12 +28,13 @@ export function PicturePicker({ name = "pictures" }: { name?: string }) {
           const order = picked.indexOf(p.id);
           return (
             <button key={p.id} type="button" onClick={() => toggle(p.id)} aria-pressed={order >= 0}
+              aria-label={order >= 0 ? `${p.label}, vald som bild ${order + 1}` : p.label}
               className="kort kort--klick relative flex h-20 flex-col items-center justify-center"
               style={order >= 0 ? { borderColor: "var(--jordgubb)" } : undefined}>
               <span className="text-3xl" aria-hidden="true">{p.emoji}</span>
               <span className="text-sm">{p.label}</span>
               {order >= 0 && (
-                <span className="absolute right-2 top-1 rounded-full bg-[var(--jordgubb)] px-2 text-sm font-bold text-white">{order + 1}</span>
+                <span aria-hidden="true" className="absolute right-2 top-1 rounded-full bg-[var(--jordgubb)] px-2 text-sm font-bold text-white">{order + 1}</span>
               )}
             </button>
           );

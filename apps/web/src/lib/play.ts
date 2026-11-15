@@ -1,11 +1,12 @@
 import "server-only";
-import { mathSkills } from "@eggly/content";
+import { MATTE_STOPS, mathSkills } from "@eggly/content";
 import {
   MATH_SKILLS_WITH_TEMPLATES, emptySkill, entryGradeFor, hashSeed, isCorrect, mathTemplates, newSession,
   nextQuestion, recordAnswer, seededRng,
   type ChildModel, type Mode, type Planned, type SessionState, type SkillState, type Visual,
 } from "@eggly/engine";
 import { supabaseAdmin } from "./supabase/admin";
+import { finishStop, openStop, type StopResult } from "./world";
 
 /**
  * Spelomgången på servern. Barnets id kommer alltid från den verifierade inloggningen, aldrig från
@@ -44,6 +45,7 @@ export interface SessionSummary {
   total: number;
   stars: number;
   skills: { title: string; correct: number; total: number }[];
+  stop?: StopResult & { name: string };
 }
 
 interface PendingPlan { planned: Planned; tries: number }
@@ -82,14 +84,18 @@ function rngFor(sessionId: string, index: number) {
   return seededRng(hashSeed(`${sessionId}:${index}:${Date.now()}`));
 }
 
-/** Startar ett nytt pass och visar första uppgiften. */
-export async function startSession(childId: string, mode: Mode): Promise<ClientQuestion> {
+const STOP_PREFIX = "stopp:";
+
+/** Startar ett nytt pass på ett öppet stopp på kartan och visar första uppgiften. */
+export async function startSession(childId: string, mode: Mode, stopId: string): Promise<ClientQuestion> {
+  const stop = await openStop(childId, stopId);
+  if (!stop) throw new Error("Stoppet är inte öppet");
   const db = supabaseAdmin();
   const { data: sess, error } = await db.from("play_sessions")
-    .insert({ child_id: childId, subject: "matte", mode, activity: "aggjakten" })
+    .insert({ child_id: childId, subject: "matte", mode, activity: STOP_PREFIX + stop.id })
     .select("id").single();
   if (error || !sess) throw new Error("Passet gick inte att starta");
-  const state = newSession(sess.id, mode);
+  const state = newSession(sess.id, mode, { skills: stop.skills, source: "child_choice" });
   const child = await loadChild(childId);
   const planned = nextQuestion(child, state, { now: Date.now(), rng: rngFor(sess.id, 0), available: MATH_SKILLS_WITH_TEMPLATES });
   await db.from("play_sessions").update({ state }).eq("id", sess.id);
@@ -141,7 +147,7 @@ export async function answerQuestion(childId: string, sessionId: string, raw: st
   const correct = ok;
   const now = Date.now();
   const [{ data: sessRow }, child] = await Promise.all([
-    db.from("play_sessions").select("state, mode, items_done").eq("id", sessionId).eq("child_id", childId).single(),
+    db.from("play_sessions").select("state, mode, items_done, activity").eq("id", sessionId).eq("child_id", childId).single(),
     loadChild(childId),
   ]);
   if (!sessRow) return null;
@@ -179,7 +185,18 @@ export async function answerQuestion(childId: string, sessionId: string, raw: st
   const message = giveUp ? `Så här blir det: ${hintsFor(planned, 3).at(-1)}` : correct && hintLevel === 0 ? "Rätt!" : "Rätt! Bra kämpat.";
   if (done >= ITEMS_PER_SESSION) {
     await db.from("play_sessions").update({ state: out.session, items_done: done, ended_at: new Date(now).toISOString() }).eq("id", sessionId);
-    return { status: giveUp ? "revealed" : "correct", message, stars, summary: summarize(out.session) };
+    const summary = summarize(out.session);
+    const activity = (sessRow.activity as string | null) ?? "";
+    if (activity.startsWith(STOP_PREFIX)) {
+      const stopId = activity.slice(STOP_PREFIX.length);
+      const stop = MATTE_STOPS.find((x) => x.id === stopId);
+      if (stop) {
+        const clean = out.session.items.filter((x) => x.correct && x.hintLevel === 0).length;
+        const r = await finishStop(childId, stopId, { correct: summary.correct, clean, total: summary.total });
+        summary.stop = { ...r, name: stop.name };
+      }
+    }
+    return { status: giveUp ? "revealed" : "correct", message, stars, summary };
   }
 
   const nextPlanned = nextQuestion(out.child, out.session, { now, rng: rngFor(sessionId, done), available: MATH_SKILLS_WITH_TEMPLATES });
