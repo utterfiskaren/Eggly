@@ -27,10 +27,10 @@ const LIVES = [5, 5, 4, 4, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2];
 export const livesFor = (s: Step) => LIVES[Math.min(LIVES.length - 1, s.world)];
 
 /** Spelen som är byggda. Ett steg vars spel inte finns än spelas som det närmaste som finns. */
-export const BUILT: GameId[] = ["rakna", "bubbel", "sant", "fanga", "storre", "krossa", "kiosk", "minne", "spurt", "strid"];
+export const BUILT: GameId[] = ["rakna", "bubbel", "sant", "fanga", "storre", "krossa", "kiosk", "minne", "spurt", "strid", "rush"];
 const STAND_IN: Record<GameId, GameId> = {
   rakna: "rakna", bubbel: "bubbel", sant: "sant", minne: "minne", fanga: "fanga", kiosk: "kiosk",
-  krossa: "krossa", storre: "storre", spurt: "spurt", strid: "strid",
+  krossa: "krossa", storre: "storre", spurt: "spurt", strid: "strid", rush: "rush",
 };
 export const playedAs = (g: GameId): GameId => (BUILT.includes(g) ? g : STAND_IN[g]);
 
@@ -40,6 +40,7 @@ const GAME_CFG: Record<GameId, { reps?: Representation[]; n: number }> = {
   minne: { reps: ["symbol"], n: 6 }, kiosk: { reps: ["symbol", "story"], n: 6 },
   // Spurten och Striden behöver många uppgifter i reserv: hur många som går åt beror på barnet.
   spurt: { reps: ["symbol", "missing"], n: 60 }, strid: { reps: ["symbol", "missing"], n: 40 },
+  rush: { reps: ["symbol", "missing"], n: 12 },
 };
 
 export interface RoundQuestion {
@@ -266,7 +267,7 @@ async function buildRound(childId: string, step: RoundSpec): Promise<Round | nul
   } else {
     plan = planRound(child, session, n, ctx);
     questions = plan.map((p) => toRoundQuestion(p, rng));
-    if (played === "fanga") buddySvg = await loadBuddy(childId);
+    if (played === "fanga" || played === "rush") buddySvg = await loadBuddy(childId);
   }
 
   await db.from("pending_questions").insert({

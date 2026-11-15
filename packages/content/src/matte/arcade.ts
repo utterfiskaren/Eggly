@@ -64,10 +64,11 @@ export const ARCADE_GAME_INFO: Record<GameId, string> = {
   storre: "Vilket tal blir störst? Eller är de lika?",
   spurt: "Hur många hinner du innan klockan tar slut?",
   strid: "Svara rätt för att slå bossen. Din klämmis spelar roll!",
+  rush: "Spring i rätt bana och ta det rätta talet. Undvik de felaktiga!",
 };
 
 /** Ordningen på korten, som i Eggly 1. */
-export const ARCADE_GAME_ORDER: GameId[] = ["rakna", "bubbel", "sant", "minne", "fanga", "kiosk", "krossa", "storre", "spurt", "strid"];
+export const ARCADE_GAME_ORDER: GameId[] = ["rakna", "bubbel", "sant", "minne", "fanga", "kiosk", "krossa", "storre", "spurt", "rush", "strid"];
 
 /**
  * Färdigheterna motorn väljer bland för en nivå och ett matteslag: stoppet för nivån och stoppet före.

@@ -23,6 +23,8 @@ export function GameGlyph({ game, size = 56 }: { game: GameId; size?: number }) 
       return <svg {...common}><path d="M12 14l40 18-40 18z" fill="none" stroke={ink} strokeWidth="5" strokeLinejoin="round" strokeLinecap="round" /><circle cx="52" cy="14" r="5" fill={pink} /></svg>;
     case "spurt":
       return <svg {...common}><circle cx="32" cy="36" r="22" fill={milk} stroke={ink} strokeWidth="3" /><path d="M32 36V22M26 8h12" stroke={ink} strokeWidth="4" strokeLinecap="round" /><path d="M32 36l10 6" stroke={pink} strokeWidth="4" strokeLinecap="round" /></svg>;
+    case "rush":
+      return <svg {...common}><path d="M6 46A26 26 0 0 1 58 46" fill="none" stroke={pink} strokeWidth="6" /><path d="M13 46A19 19 0 0 1 51 46" fill="none" stroke={sun} strokeWidth="6" /><path d="M20 46A12 12 0 0 1 44 46" fill="none" stroke={mint} strokeWidth="6" /><circle cx="32" cy="46" r="6" fill="#fff" stroke={ink} strokeWidth="3" /></svg>;
     case "strid":
       return <svg {...common}><path d="M10 54L44 12M44 12l10-2-2 10M54 54L20 12M20 12L10 10l2 10" stroke={ink} strokeWidth="5" fill="none" strokeLinecap="round" strokeLinejoin="round" /><circle cx="32" cy="32" r="5" fill={pink} /></svg>;
   }

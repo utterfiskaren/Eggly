@@ -38,6 +38,7 @@ export default async function Page() {
         <div className="flex flex-wrap gap-2">
           <Link href="/spela/spel" className="squish squish--liten">Alla spel</Link>
           <Link href="/spela/ova" className="squish squish--liten squish--mjuk">Öva</Link>
+          <Link href="/spela/framsteg" className="squish squish--liten squish--mjuk">Mina framsteg</Link>
           <Link href="/spela/samling" className="squish squish--liten squish--mjuk">Min samling</Link>
         </div>
       </div>

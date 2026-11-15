@@ -9,7 +9,7 @@ import { MATTE_STOPS } from "./world";
  * Varje steg spelas som ett minispel. Klarar man steget får man ett ägg från världens nivå.
  */
 
-export type GameId = "rakna" | "bubbel" | "sant" | "minne" | "fanga" | "kiosk" | "krossa" | "storre" | "spurt" | "strid";
+export type GameId = "rakna" | "bubbel" | "sant" | "minne" | "fanga" | "kiosk" | "krossa" | "storre" | "spurt" | "strid" | "rush";
 
 export interface Step {
   /** Samma id som i Eggly 1 (t.ex. «b1» eller «n3_7»). Byt aldrig. */
@@ -44,7 +44,7 @@ export const TEMPO = [
 
 export const GAME_NAMES: Record<GameId, string> = {
   rakna: "Räkna", bubbel: "Bubbelpop", sant: "Rätt eller fel", minne: "Minnet", fanga: "Fånga talen",
-  kiosk: "Kiosken", krossa: "Talkross", storre: "Vem är störst?", spurt: "Spurten", strid: "Striden",
+  kiosk: "Kiosken", krossa: "Talkross", storre: "Vem är störst?", spurt: "Spurten", strid: "Striden", rush: "Rainbow Rush",
 };
 
 /** Bossen i varje värld (index = nivå), från Eggly 1. */

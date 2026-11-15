@@ -11,6 +11,7 @@ import { Fanga } from "./games/Fanga";
 import { Storre } from "./games/Storre";
 import { Krossa } from "./games/Krossa";
 import { Kiosk } from "./games/Kiosk";
+import { Rush } from "./games/Rush";
 import { Confetti } from "./Confetti";
 import { setSound, sfx, soundOn } from "@/lib/sfx";
 import { Minne } from "./games/Minne";
@@ -19,7 +20,7 @@ import { Strid } from "./games/Strid";
 import type { BoardProps, GameProps } from "./games/types";
 
 const GAMES: Record<string, (p: GameProps) => React.ReactNode> = {
-  rakna: Rakna, bubbel: Bubbel, sant: Sant, fanga: Fanga, storre: Storre, krossa: Krossa, kiosk: Kiosk,
+  rakna: Rakna, bubbel: Bubbel, sant: Sant, fanga: Fanga, storre: Storre, krossa: Krossa, kiosk: Kiosk, rush: Rush,
 };
 
 const BOARDS: Record<string, (p: BoardProps) => React.ReactNode> = { minne: Minne, spurt: Spurt, strid: Strid };
