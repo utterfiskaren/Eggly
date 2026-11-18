@@ -10,8 +10,8 @@ export const metadata: Metadata = { title: "Spela" };
 
 const ISLANDS = [
   { id: "matte", name: "Matteön", color: "var(--mynta)", note: "Spela nu", href: "/spela/matte" },
-  { id: "svenska", name: "Ordön", color: "var(--himmel)", note: "Kommer snart", href: null },
-  { id: "engelska", name: "Språkön", color: "var(--apelsin)", note: "Kommer snart", href: null },
+  { id: "svenska", name: "Ordön", color: "var(--himmel)", note: "Spela nu", href: "/spela/sprak?o=svenska" },
+  { id: "engelska", name: "Språkön", color: "var(--apelsin)", note: "Spela nu", href: "/spela/sprak?o=engelska" },
 ];
 
 export default async function Page() {
