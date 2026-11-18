@@ -1,5 +1,8 @@
 export * from "./types";
 export { mathSkills } from "./matte/skills";
+export { swedishSkills } from "./svenska/skills";
+export { englishSkills } from "./engelska/skills";
+export { languageSkills } from "./sprak";
 export { validateSkills, skillDepths } from "./validate";
 export { skillsSeedSql } from "./seed";
 export { MATTE_STOPS, ORIGINAL_STOP_IDS, WORLD_RULES, stopStars, openStops, eggsAvailable, eggProgress, type WorldStop } from "./matte/world";

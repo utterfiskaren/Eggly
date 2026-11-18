@@ -7,6 +7,7 @@ Designtesen står i valvet: `02 Kodvalv/Eggly/DESIGN – Eggly.md`.
 - `apps/web` – Next.js 16 (App Router, `proxy.ts` i stället för middleware). Spelet under `/spela`, portalen under `/portal`.
 - `packages/content` – kunskapskartan (färdigheter, förkunskaper, kursplanetaggar) och validering.
 - `packages/engine` – motorn (Elo, FSRS, regler). Ren kod utan skärm, testas med simulerade elever.
+- `packages/content/src/svenska` och `engelska` – kunskapskartor för Ordön och Språkön (`sv.*`, `en.*`). `packages/engine/src/language` – språkmotorn: textuppgifter med flervalssvar från handskrivna listor, aldrig fritt genererade. Provsidan `/spela/sprak` är inte länkad från startsidan och sparar inget än.
 - `supabase/migrations` – SQL för schemat `eggly`. Körs i projektet uppsalafest tills flytten.
 
 ## Regler
