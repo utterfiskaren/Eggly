@@ -161,3 +161,64 @@ button, a, .squish, .kort--klick { touch-action: manipulation; }
 @keyframes strid-slag-v { 0%, 100% { transform: translateX(0); } 40% { transform: translateX(-16px) scale(1.05); } }
 @keyframes strid-skadad { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px) rotate(-3deg); } 75% { transform: translateX(6px) rotate(3deg); } }
 @media (prefers-reduced-motion: reduce) { .strid-slag, .strid-slag-v, .strid-skadad { animation: none; } }
+
+/* ── Fas 3a: tillbaka mot Eggly 1 – pastell, mjuka bubblor och en levande karta ── */
+body { background: linear-gradient(165deg, #fff1f7 0%, #f3ecff 45%, #e8f2ff 100%) fixed; }
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(circle at 8% 12%, rgba(255, 182, 213, .45) 0 120px, transparent 121px),
+    radial-gradient(circle at 92% 22%, rgba(255, 226, 150, .42) 0 70px, transparent 71px),
+    radial-gradient(circle at 88% 72%, rgba(170, 230, 210, .42) 0 100px, transparent 101px),
+    radial-gradient(circle at 14% 90%, rgba(180, 210, 255, .45) 0 80px, transparent 81px);
+}
+
+.kl-hud { background: rgba(255, 255, 255, .92); border: 2px solid var(--dimma); box-shadow: 0 5px 0 var(--dimma); backdrop-filter: blur(6px); }
+.kl-chip { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 0 var(--s-3); border-radius: var(--r-pill); background: #fff6d6; font-family: var(--font-display); font-weight: 600; font-size: var(--t-md); }
+.kl-nav { background: linear-gradient(180deg, transparent, rgba(246, 243, 255, .96) 38%); }
+.kl-varld { border: 3px solid; border-radius: var(--r-lg); box-shadow: 0 7px 0 rgba(42, 27, 61, .12); }
+.kl-bar { height: 12px; border-radius: var(--r-pill); background: rgba(255, 255, 255, .7); overflow: hidden; }
+.kl-bar > span { display: block; height: 100%; border-radius: var(--r-pill); min-width: 12px; }
+.kl-silhuett svg { filter: brightness(0) opacity(.45); }
+
+.kl-skylt { margin: 2px auto 0; width: max-content; max-width: 150px; padding: 2px 10px; border-radius: var(--r-pill); background: rgba(255, 255, 255, .92); border: 2px solid var(--dimma); font-family: var(--font-display); font-size: var(--t-xs); font-weight: 600; text-align: center; color: var(--plommon); }
+.kl-prat { position: relative; margin: 0 auto 4px; width: max-content; padding: 2px 10px; border-radius: var(--r-pill); background: var(--jordgubb); color: #fff; font-family: var(--font-display); font-size: var(--t-sm); font-weight: 600; }
+.kl-prat::after { content: ""; position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%); border: 6px solid transparent; border-top-color: var(--jordgubb); border-bottom: 0; }
+.kl-boss { animation: kl-hugg 2.6s ease-in-out infinite; transform-origin: 50% 100%; }
+.kl-boss--slagen { filter: grayscale(.9) opacity(.6); animation: none; transform: rotate(-12deg); }
+
+.kl-hopp { animation: kl-hopp 2.2s ease-in-out infinite; transform-origin: 50% 100%; transform-box: fill-box; }
+.kl-moln { animation: kl-moln 14s ease-in-out infinite alternate; transform-box: fill-box; }
+.kl-moln--b { animation-duration: 19s; animation-direction: alternate-reverse; }
+.kl-blink { animation: kl-blink 2.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.kl-ring { transform-box: fill-box; transform-origin: center; animation: kl-ring 1.8s ease-out infinite; }
+.kl-pulsa { animation: kl-pulsa 1.6s ease-in-out infinite; }
+
+@keyframes kl-hopp { 0%, 100% { transform: translateY(0) scale(1, 1); } 45% { transform: translateY(-9px) scale(.97, 1.04); } 60% { transform: translateY(0) scale(1.05, .94); } }
+@keyframes kl-hugg { 0%, 100% { transform: rotate(-3deg) scale(1); } 50% { transform: rotate(3deg) scale(1.04); } }
+@keyframes kl-moln { from { transform: translateX(-14px); } to { transform: translateX(14px); } }
+@keyframes kl-blink { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .55; transform: scale(.82); } }
+@keyframes kl-ring { 0% { transform: scale(.9); opacity: .9; } 100% { transform: scale(1.55); opacity: 0; } }
+@keyframes kl-pulsa { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+@media (prefers-reduced-motion: reduce) {
+  .kl-hopp, .kl-moln, .kl-blink, .kl-ring, .kl-pulsa, .kl-boss { animation: none; }
+}
+
+/* ── Fas 3a: levande samling ── */
+.kl-ruta { background: #fff; border: 2px solid var(--dimma); border-radius: var(--r-md); box-shadow: 0 5px 0 var(--dimma); cursor: pointer; min-height: 132px; transition: transform 90ms ease-out, box-shadow 90ms ease-out; -webkit-tap-highlight-color: transparent; }
+.kl-ruta:active { transform: translateY(5px) scale(.97); box-shadow: 0 0 0 var(--dimma); }
+.kl-ruta--pa { border-color: var(--jordgubb); background: #fff7fb; }
+.kl-gung { animation: kl-gung 3.4s ease-in-out infinite; transform-origin: 50% 90%; }
+.kl-glad { animation: kl-glad 520ms cubic-bezier(.3, 1.6, .5, 1); }
+.kl-antal { position: absolute; top: 4px; right: 6px; padding: 0 7px; border-radius: var(--r-pill); background: var(--plommon); color: #fff; font-family: var(--font-display); font-size: var(--t-xs); font-weight: 600; }
+.kl-tom { border: 2px dashed; border-radius: var(--r-md); opacity: .7; }
+.kl-tom-agg { display: grid; place-items: center; width: 54px; height: 68px; border-radius: var(--agg); font-family: var(--font-display); font-size: var(--t-2xl); font-weight: 600; color: var(--plommon-2); }
+.kl-hjartan { position: absolute; left: 50%; top: 22px; pointer-events: none; }
+.kl-hjartan i { position: absolute; font-style: normal; color: var(--jordgubb); font-size: var(--t-xl); opacity: 0; animation: kl-hjarta 900ms ease-out forwards; }
+.kl-hjartan i:nth-child(1) { left: -26px; }
+.kl-hjartan i:nth-child(2) { left: -4px; animation-delay: 90ms; }
+.kl-hjartan i:nth-child(3) { left: 18px; animation-delay: 180ms; }
+@keyframes kl-gung { 0%, 100% { transform: rotate(-3deg) scale(1, 1); } 50% { transform: rotate(3deg) scale(1.03, .97); } }
+@keyframes kl-glad { 0% { transform: scale(1); } 30% { transform: translateY(-14px) scale(.94, 1.1); } 60% { transform: translateY(0) scale(1.1, .88); } 100% { transform: scale(1); } }
+@keyframes kl-hjarta { 0% { opacity: 0; transform: translateY(0) scale(.6); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateY(-56px) scale(1.2); } }
+@media (prefers-reduced-motion: reduce) { .kl-gung, .kl-glad, .kl-hjartan i, .kl-ruta { animation: none; transition: none; } .kl-hjartan i { opacity: 1; } }
